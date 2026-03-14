@@ -1,0 +1,220 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  # ── Register generation & drift check ────────────────────────────────────────
+  regs:
+    name: Register Generation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate register files
+        run: make regs
+
+      - name: Check for drift (regenerate and diff)
+        run: |
+          cp -r gen/ gen_orig/
+          make regs
+          diff -rq gen_orig/ gen/ \
+            || (echo "ERROR: Regenerated files differ — commit the updated gen/ outputs." && exit 1)
+
+  # ── VHDL lint (GHDL analysis + vsg) ─────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    needs: regs
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install GHDL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ghdl
+
+      - name: Install Verilator
+        run: |
+          sudo apt-get install -y verilator
+
+      - name: Install Bender
+        run: |
+          curl -sSL https://github.com/pulp-platform/bender/releases/latest/download/bender-linux-x86_64.tar.gz \
+            | tar -xz -C /usr/local/bin/
+
+      - name: Generate register files
+        run: pip install -r requirements.txt && make regs
+
+      - name: VHDL lint (GHDL + vsg)
+        run: make lint-vhdl
+
+      - name: SV lint (Verilator)
+        run: make lint-sv
+
+  # ── VHDL simulation — VUnit + GHDL ───────────────────────────────────────────
+  sim-vhdl-vunit:
+    name: "VHDL / GHDL / VUnit"
+    runs-on: ubuntu-latest
+    needs: regs
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install GHDL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ghdl
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate register files
+        run: make regs
+
+      - name: Run VUnit testbench
+        run: make sim FRAMEWORK=vunit
+
+      - name: Upload VUnit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vunit-results
+          path: vunit_out/
+
+  # ── VHDL simulation — cocotb + GHDL ──────────────────────────────────────────
+  sim-vhdl-cocotb:
+    name: "VHDL / GHDL / cocotb"
+    runs-on: ubuntu-latest
+    needs: regs
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install GHDL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ghdl
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate register files
+        run: make regs
+
+      - name: Run cocotb testbench (GHDL)
+        run: make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl
+
+  # ── SV simulation — cocotb + Verilator ───────────────────────────────────────
+  sim-sv-verilator:
+    name: "SV / Verilator / cocotb"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Verilator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run cocotb testbench (Verilator)
+        run: make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv
+
+  # ── SV simulation — cocotb + Icarus Verilog ───────────────────────────────────
+  sim-sv-icarus:
+    name: "SV / Icarus / cocotb"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run cocotb testbench (Icarus)
+        run: make sim FRAMEWORK=cocotb SIM=icarus TOPLEVEL_HDL=sv
+
+  # ── Yosys synthesis ───────────────────────────────────────────────────────────
+  synth:
+    name: "Synthesis (Yosys XC7)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Yosys
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yosys
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate register files
+        run: make regs
+
+      - name: Synthesise SV (native Yosys path)
+        run: make synth TOPLEVEL_HDL=sv
+
+      - name: Upload synthesis output
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthesis-output
+          path: synth/output/
+
+  # ── hdl_autodoc Python test suite ─────────────────────────────────────────────
+  test-autodoc:
+    name: "hdl_autodoc test suite"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        run: make test-autodoc

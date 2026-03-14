@@ -1,0 +1,30 @@
+# HDL Template Python dependencies.
+# Install via: make venv (creates .venv/) or pip install -r requirements.txt
+
+# ── Verification frameworks ───────────────────────────────────────────────────
+vunit-hdl>=4.7
+cocotb>=2.0
+
+# ── Register generation ───────────────────────────────────────────────────────
+hdl-registers>=8.0
+
+# ── VHDL linting ─────────────────────────────────────────────────────────────
+# vsg (VHDL Style Guide): style/convention linter configured via vsg.yml
+vsg>=3.0
+
+# ── Sphinx documentation (HDL AutoDoc pipeline) ───────────────────────────────
+sphinx>=7.0,<9.0
+
+# Pin docutils — sphinx-vhdl 0.2.x has a transition-node bug with docutils 0.21+
+docutils>=0.18,<0.21
+
+sphinx-rtd-theme>=2.0
+
+# WaveDrom timing diagrams via .. wavedrom:: directive in VHDL comments
+sphinxcontrib-wavedrom>=3.0
+
+# VHDL domain — enables :vhdl: cross-references in Sphinx
+sphinx-vhdl>=0.1
+
+# Offline WaveDrom rendering (no Node.js required for PDF builds)
+wavedrom

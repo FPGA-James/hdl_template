@@ -1,0 +1,63 @@
+CAPI=2:
+# Keep in sync with Bender.yml
+# FuseSoC CAPI2 manifest for the HDL template.
+
+name: "acme:templates:hdl_template:0.1.0"
+
+filesets:
+  rtl_vhdl:
+    description: "VHDL RTL sources"
+    files:
+      - src/vhdl/NAME_pkg.vhd
+      - src/vhdl/NAME_core.vhd
+      - src/vhdl/NAME_top.vhd
+    file_type: vhdlSource-2008
+
+  gen_vhdl:
+    description: "Generated VHDL register files (run make regs first)"
+    files:
+      - gen/vhdl/NAME_regs_pkg.vhd
+      - gen/vhdl/NAME_register_record_pkg.vhd
+      - gen/vhdl/NAME_register_file_axi_lite.vhd
+    file_type: vhdlSource-2008
+
+  rtl_sv:
+    description: "SystemVerilog RTL sources"
+    files:
+      - src/sv/NAME_pkg.sv
+      - src/sv/NAME_core.sv
+      - src/sv/NAME_top.sv
+    file_type: systemVerilogSource
+
+  tb_vhdl:
+    description: "VHDL testbench (VUnit)"
+    files:
+      - tb/vunit/vhdl/NAME_tb.vhd
+    file_type: vhdlSource-2008
+
+targets:
+  default: &default
+    filesets:
+      - rtl_vhdl
+      - gen_vhdl
+    toplevel: NAME_top
+
+  sim:
+    <<: *default
+    filesets_append:
+      - tb_vhdl
+    default_tool: ghdl
+    tools:
+      ghdl:
+        analyze_options: [--std=08]
+        run_options: [--wave=waves/NAME_top.fst]
+
+  sim_sv:
+    filesets:
+      - rtl_sv
+    toplevel: NAME_top
+    default_tool: icarus
+
+  synth:
+    <<: *default
+    default_tool: yosys

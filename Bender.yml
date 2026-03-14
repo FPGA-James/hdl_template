@@ -1,0 +1,57 @@
+package:
+  name: hdl_template
+  authors:
+    - "FPGA-James"
+
+# ── External HDL dependencies ─────────────────────────────────────────────────
+# Run `make deps` to fetch these into deps/ via `bender vendor init`.
+
+dependencies:
+  # hdl-modules: VHDL support library required by the hdl_registers AXI-Lite
+  # register file generator (axi_lite_pkg, register_file_pkg).
+  hdl_modules:
+    git: "https://github.com/hdl-modules/hdl-modules.git"
+    version: "5.1.0"
+
+# ── Vendor configuration ──────────────────────────────────────────────────────
+# All external repos are vendored into deps/ on `bender vendor init`.
+
+vendor_package:
+  - name: hdl_modules
+    target_dir: deps/hdl_modules
+
+# ── Source file declarations ──────────────────────────────────────────────────
+# Targets:
+#   rtl_vhdl   — VHDL RTL sources (included for VHDL simulation and synthesis)
+#   rtl_sv     — SystemVerilog RTL sources
+#   gen_vhdl   — Generated VHDL register files (produced by `make regs`)
+#   tb_vhdl    — VHDL testbench sources (simulation only)
+
+sources:
+  # ── VHDL RTL ──────────────────────────────────────────────────────────────
+  - target: rtl_vhdl
+    files:
+      - src/vhdl/NAME_pkg.vhd
+      - src/vhdl/NAME_core.vhd
+      - src/vhdl/NAME_top.vhd
+
+  # ── Generated VHDL register files (from `make regs`) ──────────────────────
+  # These are listed under a separate target so they can be included
+  # independently during linting and synthesis.
+  - target: gen_vhdl
+    files:
+      - gen/vhdl/NAME_regs_pkg.vhd
+      - gen/vhdl/NAME_register_record_pkg.vhd
+      - gen/vhdl/NAME_register_file_axi_lite.vhd
+
+  # ── SystemVerilog RTL ──────────────────────────────────────────────────────
+  - target: rtl_sv
+    files:
+      - src/sv/NAME_pkg.sv
+      - src/sv/NAME_core.sv
+      - src/sv/NAME_top.sv
+
+  # ── VHDL testbench (VUnit, simulation only) ────────────────────────────────
+  - target: all(simulation, tb_vhdl)
+    files:
+      - tb/vunit/vhdl/NAME_tb.vhd

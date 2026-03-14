@@ -1,0 +1,32 @@
+# <<NAME>> — Yosys synthesis script (VHDL path, Xilinx 7-series).
+#
+# Uses ghdl-yosys-plugin to read VHDL source directly.
+# Requires: yosys + ghdl-yosys-plugin (install via package manager or build from source).
+#
+# Run via: make synth
+# Run directly: yosys synth/<<NAME>>_vhdl_xc7.ys
+
+# ── Load GHDL plugin ──────────────────────────────────────────────────────────
+plugin -i ghdl
+
+# ── Read VHDL sources (order matters: pkg → generated → core → top) ───────────
+ghdl --std=08 \
+    src/vhdl/<<NAME>>_pkg.vhd \
+    gen/vhdl/<<NAME>>_regs_pkg.vhd \
+    gen/vhdl/<<NAME>>_register_record_pkg.vhd \
+    gen/vhdl/<<NAME>>_register_file_axi_lite.vhd \
+    src/vhdl/<<NAME>>_core.vhd \
+    src/vhdl/<<NAME>>_top.vhd \
+    -e <<NAME>>_top
+
+# ── Synthesise for Xilinx 7-series ────────────────────────────────────────────
+# -family xc7  : target Artix-7 / Kintex-7 / Spartan-7 / Zynq-7000 primitives
+# -top         : design top-level entity
+# -edif        : output EDIF netlist (for Vivado implementation)
+synth_xilinx -family xc7 -top <<NAME>>_top -edif synth/output/<<NAME>>_vhdl.edif
+
+# Also write JSON (useful for inspection and nextpnr-xilinx)
+write_json synth/output/<<NAME>>_vhdl.json
+
+# Print resource utilisation summary
+stat -tech xilinx

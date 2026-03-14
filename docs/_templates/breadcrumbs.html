@@ -1,0 +1,13 @@
+{#
+  breadcrumbs.html — override the RTD breadcrumb bar to add a
+  "Edit on GitHub" stub and a build-timestamp badge.
+#}
+{% extends "!breadcrumbs.html" %}
+
+{% block breadcrumbs_aside %}
+  <div class="hdl-breadcrumb-aside">
+    <span class="hdl-build-badge" title="Documentation build">
+      📄 {{ project }} v{{ release }}
+    </span>
+  </div>
+{% endblock %}

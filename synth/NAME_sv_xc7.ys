@@ -1,0 +1,19 @@
+# <<NAME>> — Yosys synthesis script (SystemVerilog path, Xilinx 7-series).
+#
+# Reads SystemVerilog natively (no GHDL plugin required).
+# The SV top-level does not instantiate the generated VHDL register file;
+# replace the stub register connections in NAME_top.sv with your SV register block.
+#
+# Run via: make synth TOPLEVEL_HDL=sv
+# Run directly: yosys synth/<<NAME>>_sv_xc7.ys
+
+# ── Read SystemVerilog sources (order matters: pkg → core → top) ──────────────
+read_verilog -sv src/sv/<<NAME>>_pkg.sv
+read_verilog -sv src/sv/<<NAME>>_core.sv
+read_verilog -sv src/sv/<<NAME>>_top.sv
+
+# ── Synthesise for Xilinx 7-series ────────────────────────────────────────────
+synth_xilinx -family xc7 -top <<NAME>>_top -edif synth/output/<<NAME>>_sv.edif
+write_json synth/output/<<NAME>>_sv.json
+
+stat -tech xilinx

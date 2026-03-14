@@ -1,0 +1,57 @@
+# vsg.yml — VHDL Style Guide linter configuration.
+# Run via: make lint-vhdl
+# Docs: https://vsg-hdl.readthedocs.io/
+
+---
+rules:
+  # ── Indentation ──────────────────────────────────────────────────────────────
+  indent:
+    spaces: 4
+
+  # ── Naming conventions ────────────────────────────────────────────────────────
+  naming:
+    # Entity names: no required prefix/suffix
+    entity:
+      prefix: ""
+      suffix: ""
+    # Architecture names must be one of the listed identifiers
+    architecture:
+      name:
+        - rtl
+        - bench
+        - str
+        - behav
+    # Signals: registered signals use _r suffix, combinational signals _s
+    signal:
+      # Enforce _r suffix for registered signals and _s for combinational via
+      # process label conventions rather than a blanket rename rule.
+      # Adjust or remove if your naming conventions differ.
+      prefix: ""
+      suffix: ""
+    # Generics: G_ prefix
+    generic:
+      prefix: "G_"
+      suffix: ""
+    # Constants: C_ prefix
+    constant:
+      prefix: "C_"
+      suffix: ""
+    # Types: t_ prefix
+    type:
+      prefix: "t_"
+      suffix: ""
+    # Port names: no required prefix/suffix (HDL AutoDoc extracts comments)
+    port:
+      prefix: ""
+      suffix: ""
+
+  # ── Rules to relax ────────────────────────────────────────────────────────────
+  # These rules are common sources of false positives in well-written HDL.
+
+  # Allow multiple assignments per line in case statements.
+  case_010:
+    severity: warning
+
+  # Do not require 'all' in process sensitivity lists (VHDL-2008 allows this).
+  process_012:
+    severity: warning

@@ -1,0 +1,54 @@
+# <<NAME>> register map.
+#
+# Source format: hdl_registers TOML.
+# Run `make regs` to generate VHDL packages, C header, and HTML documentation.
+# Outputs land in gen/ (gitignored).
+#
+# Register hierarchy:
+#   conf    (r_w)    — counter configuration written by host
+#   command (wpulse) — one-shot commands (self-clearing on read)
+#   status  (r)      — counter status driven by <<NAME>>_core
+
+
+# ── conf: Counter configuration ──────────────────────────────────────────────
+[conf]
+mode = "r_w"
+description = "Counter configuration."
+
+[conf.enable]
+type = "bit"
+description = "Assert to enable pulse counting. Counter holds value when deasserted."
+default_value = "0"
+
+[conf.increment]
+type = "integer"
+description = "Step size added to the pulse count on each clock cycle while enabled."
+min_value = 1
+max_value = 255
+default_value = 1
+
+
+# ── command: One-shot commands ────────────────────────────────────────────────
+[command]
+mode = "wpulse"
+description = "One-shot command register. Each field pulses high for one clock cycle on write."
+
+[command.reset_counter]
+type = "bit"
+description = "Write 1 to reset the pulse count to zero. Automatically clears."
+default_value = "0"
+
+
+# ── status: Read-only status ──────────────────────────────────────────────────
+[status]
+mode = "r"
+description = "Current counter status (read-only, driven by <<NAME>>_core)."
+
+[status.enabled]
+type = "bit"
+description = "Asserted when the counter is actively running (enable=1 and not in reset)."
+
+[status.pulse_count]
+type = "bit_vector"
+width = 16
+description = "Running pulse count since last reset. Saturates at 65535."

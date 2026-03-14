@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" width="120" height="40">
+  <!-- chip body -->
+  <rect x="30" y="8" width="60" height="24" rx="4" fill="#2980b9"/>
+  <!-- left pins -->
+  <rect x="18" y="13" width="12" height="3" fill="#1a5276"/>
+  <rect x="18" y="19" width="12" height="3" fill="#1a5276"/>
+  <rect x="18" y="25" width="12" height="3" fill="#1a5276"/>
+  <!-- right pins -->
+  <rect x="90" y="13" width="12" height="3" fill="#1a5276"/>
+  <rect x="90" y="19" width="12" height="3" fill="#1a5276"/>
+  <rect x="90" y="25" width="12" height="3" fill="#1a5276"/>
+  <!-- chip label -->
+  <text x="60" y="23" font-family="monospace" font-size="9" fill="white"
+        text-anchor="middle">HDL</text>
+</svg>
