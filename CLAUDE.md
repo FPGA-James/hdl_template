@@ -6,10 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Open-source HDL project template supporting both VHDL and SystemVerilog. All workflows are driven through `make`. The template uses `<<NAME>>` as a placeholder that gets replaced by `make init NAME=<project>`.
 
+## Toolchain
+
+All HDL tools (GHDL, Yosys, Verilator, Icarus, nextpnr) are expected to come from **OSS CAD Suite**, installed at `~/tools/oss-cad-suite` by default. Override with `make <target> OSS_CAD_SUITE=/path/to/oss-cad-suite`.
+
 ## Initial Setup (one-time)
 
 ```bash
-make init NAME=<project_name>   # Replace <<NAME>> across all files and rename NAME_*.ext files
+make init NAME=<project_name>                    # VHDL project (default)
+make init NAME=<project_name> TOPLEVEL_HDL=sv   # SystemVerilog project
 make venv                        # Create .venv/ and install Python dependencies
 make deps                        # Fetch HDL dependencies into deps/ via Bender
 make regs                        # Generate VHDL/C/HTML from regs/<name>_regs.toml
@@ -30,10 +35,23 @@ VUNIT_SIMULATOR=ghdl .venv/bin/python tb/vunit/run.py -v "tb_lib.NAME_tb.test_co
 # Synthesis
 make synth                  # VHDL via ghdl-yosys-plugin → Xilinx 7-series
 make synth TOPLEVEL_HDL=sv  # SV via native Yosys
+make synth-gui              # Open Yosys schematic viewer after synthesis
+
+# Implementation (place-and-route via nextpnr)
+make impl                   # Synth + PnR → bitstream  [IMPL_FAMILY=ice40|ecp5|machxo2]
+make impl-gui               # Open nextpnr interactive GUI
+make icestudio              # Run impl then open IceStudio for programming
+# Key impl variables: IMPL_FAMILY (ice40), IMPL_DEVICE (hx8k), IMPL_PACKAGE (ct256)
+# IMPL_TOPLEVEL (NAME_core), IMPL_CONSTRAINT (synth/constraints/<toplevel>.pcf)
 
 # Documentation
 make html                   # Build Sphinx docs (requires make regs first)
 make html SCHEMATICS=1      # Include RTL schematics (requires yosys + ghdl-yosys-plugin)
+make pdf                    # Build LaTeX PDF documentation
+make doc                    # Build both HTML and PDF
+
+# Simulation (additional)
+make sim-vunit-gui          # VUnit + GHDL with waveform viewer
 
 # Linting
 make lint                   # All linters
@@ -48,10 +66,14 @@ make test-autodoc           # hdl_autodoc Python unit tests (pytest)
 
 # Dependency management
 make deps                   # bender update + bender vendor init → deps/
+make install                # Upgrade Python dependencies in active venv
+
+# Diagnostics
+make vars                   # Print all current Makefile variable values
 
 # Clean
-make clean                  # Remove docs/_build/ and sim artefacts
-make clean-generated        # Also remove gen/, synth/output/, filelist.f
+make clean                  # Remove out/docs/, sim artefacts
+make clean-generated        # Also remove out/regs/, out/synth/, out/impl/, filelist.f
 make clean-all              # Full reset including .venv/ and deps/
 ```
 
@@ -75,10 +97,10 @@ Every project using this template follows this structure:
 src/vhdl/        VHDL RTL (NAME_pkg.vhd, NAME_core.vhd, NAME_top.vhd)
 src/sv/          SystemVerilog RTL (same structure, identical port names)
 regs/            TOML register definitions (source of truth)
-gen/             GENERATED register outputs (gitignored)
-  gen/vhdl/      VHDL register packages + AXI-Lite wrapper
-  gen/c/         C header files
-  gen/html/      HTML register documentation
+out/             GENERATED outputs (gitignored)
+  out/regs/vhdl/ VHDL register packages + AXI-Lite wrapper
+  out/regs/c/    C header files
+  out/regs/html/ HTML register documentation
 tb/vunit/        VUnit runner (run.py) + VHDL testbenches
 tb/cocotb/       cocotb Makefile + Python test modules
 synth/           Yosys synthesis scripts (.ys) + XDC constraints
@@ -93,7 +115,7 @@ deps/            External HDL repos fetched by Bender (gitignored)
 
 ### Dependency Management
 
-**Bender** (`Bender.yml`) is the primary source of truth for all HDL file lists. The Makefile calls `bender script flist -t <target>` to get ordered file lists:
+**Bender** (`Bender.yml`) is the primary source of truth for all HDL file lists. `Bender.lock` is committed for reproducible builds. The Makefile calls `bender script flist -t <target>` to get ordered file lists:
 - `rtl_vhdl` — VHDL RTL sources
 - `rtl_sv` — SV RTL sources
 - `gen_vhdl` — generated VHDL register files
@@ -115,11 +137,11 @@ The `tb/cocotb/Makefile` enforces valid combinations with an error guard.
 ### Register Generation
 
 Register definitions live in `regs/<name>_regs.toml` using the `hdl_registers` TOML format. Running `make regs` calls `scripts/gen_regs.py` which generates:
-- `gen/vhdl/<name>_regs_pkg.vhd` — address/field constants
-- `gen/vhdl/<name>_register_record_pkg.vhd` — typed VHDL records
-- `gen/vhdl/<name>_register_file_axi_lite.vhd` — AXI-Lite register entity (this is `<<NAME>>_regs`)
-- `gen/c/<name>_regs.h` — C header for embedded drivers
-- `gen/html/<name>_regs.html` — register documentation
+- `out/regs/vhdl/<name>_regs_pkg.vhd` — address/field constants
+- `out/regs/vhdl/<name>_register_record_pkg.vhd` — typed VHDL records
+- `out/regs/vhdl/<name>_register_file_axi_lite.vhd` — AXI-Lite register entity (this is `<<NAME>>_regs`)
+- `out/regs/c/<name>_regs.h` — C header for embedded drivers
+- `out/regs/html/<name>_regs.html` — register documentation
 
 The generated AXI-Lite entity requires the `hdl-modules` library (fetched via `make deps`).
 
@@ -137,11 +159,12 @@ WaveDrom timing diagrams are embedded in VHDL process comments using `.. wavedro
 
 ### Template Initialisation
 
-`scripts/init_project.sh <name>`:
-1. Replaces all `<<NAME>>` in file contents with `<name>`
-2. Renames all `NAME_*.ext` files to `<name>_*.ext`
+`make init NAME=<name> TOPLEVEL_HDL=vhdl|sv` (default: `vhdl`):
+1. Moves `src/<hdl>/` files to `src/`, removes both `src/vhdl/` and `src/sv/`, and normalises `src/vhdl/` / `src/sv/` path references to `src/` across all config and doc files.
+2. Replaces all `<<NAME>>` in file contents with `<name>`.
+3. Renames all `NAME_*.ext` files to `<name>_*.ext`.
 
-After running `make init`, the `<<NAME>>` and `NAME_` patterns are gone. The init script validates that names are lowercase with underscores only.
+After `make init`, `src/` is flat (no language subdirectories), `<<NAME>>` and `NAME_` patterns are gone, and both Bender targets (`rtl_vhdl`, `rtl_sv`) reference `src/` — only the chosen language's files will exist there.
 
 ## Key Files
 
@@ -152,5 +175,6 @@ After running `make init`, the `<<NAME>>` and `NAME_` patterns are gone. The ini
 - `scripts/init_project.sh` — project initialisation
 - `docs/conf.py` — Sphinx configuration (project name, extensions, theme)
 - `vsg.yml` — VHDL Style Guide linter rules
-- `.github/workflows/ci.yml` — CI matrix (lint, sim×4, synth, test-autodoc)
-- `.github/workflows/docs.yml` — Sphinx → GitHub Pages deployment
+- `.github/workflows/ci.yml` — CI matrix (lint, sim×4, synth, test-autodoc); includes a `regs` job that regenerates and diffs register files to catch uncommitted drift
+- `.github/workflows/docs.yml` — Sphinx → GitHub Pages deployment (main branch only)
+- `.python-version` — pins Python 3.13 for venv and CI

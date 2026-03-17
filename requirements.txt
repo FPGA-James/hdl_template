@@ -28,3 +28,10 @@ sphinx-vhdl>=0.1
 
 # Offline WaveDrom rendering (no Node.js required for PDF builds)
 wavedrom
+
+# SVG → PDF conversion for LaTeX/PDF builds (schematic and logo SVGs)
+# Provides sphinxcontrib.rsvgconverter; [cairosvg] pulls in the pure-Python backend
+sphinxcontrib-svg2pdfconverter[cairosvg]>=1.2
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest>=7.0

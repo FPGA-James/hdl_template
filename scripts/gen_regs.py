@@ -2,11 +2,11 @@
 """Register generation script for the HDL template.
 
 Parses all TOML register definitions in regs/ and generates:
-  - VHDL register constants package       → gen/vhdl/
-  - VHDL typed record package             → gen/vhdl/
-  - VHDL AXI-Lite register file wrapper   → gen/vhdl/
-  - C header file                         → gen/c/
-  - HTML register documentation           → gen/html/ (linked by Sphinx)
+  - VHDL register constants package       → out/regs/vhdl/
+  - VHDL typed record package             → out/regs/vhdl/
+  - VHDL AXI-Lite register file wrapper   → out/regs/vhdl/
+  - C header file                         → out/regs/c/
+  - HTML register documentation           → out/regs/html/ (linked by Sphinx)
 
 Run via: make regs
 """
@@ -22,9 +22,9 @@ from hdl_registers.generator.html.page import HtmlPageGenerator
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REGS_DIR  = REPO_ROOT / "regs"
-GEN_VHDL  = REPO_ROOT / "gen" / "vhdl"
-GEN_C     = REPO_ROOT / "gen" / "c"
-GEN_HTML  = REPO_ROOT / "gen" / "html"
+GEN_VHDL  = REPO_ROOT / "out" / "regs" / "vhdl"
+GEN_C     = REPO_ROOT / "out" / "regs" / "c"
+GEN_HTML  = REPO_ROOT / "out" / "regs" / "html"
 
 
 def generate_from_toml(toml_path: Path) -> None:
@@ -63,9 +63,8 @@ def generate_from_toml(toml_path: Path) -> None:
 
 
 def main() -> None:
-    GEN_VHDL.mkdir(parents=True, exist_ok=True)
-    GEN_C.mkdir(parents=True, exist_ok=True)
-    GEN_HTML.mkdir(parents=True, exist_ok=True)
+    for d in (GEN_VHDL, GEN_C, GEN_HTML):
+        d.mkdir(parents=True, exist_ok=True)
 
     toml_files = sorted(REGS_DIR.glob("*.toml"))
     if not toml_files:
@@ -75,7 +74,7 @@ def main() -> None:
     for toml_path in toml_files:
         generate_from_toml(toml_path)
 
-    print(f"Register generation complete.")
+    print("Register generation complete.")
     print(f"  VHDL  → {GEN_VHDL}")
     print(f"  C     → {GEN_C}")
     print(f"  HTML  → {GEN_HTML}")

@@ -1,22 +1,15 @@
 # =============================================================================
 # HDL Template — Top-Level Makefile
-#
-# Usage:
-#   make venv                         Set up Python virtual environment (once)
-#   make init NAME=my_module          Initialise project (replace <<NAME>>)
-#   make deps                         Fetch HDL dependencies via Bender
-#   make regs                         Generate register files from TOML
-#   make sim                          Run simulation (default: vunit + ghdl + vhdl)
-#   make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl
-#   make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv
-#   make sim FRAMEWORK=cocotb SIM=icarus   TOPLEVEL_HDL=sv
-#   make synth                        Synthesise with Yosys (default: VHDL path)
-#   make synth TOPLEVEL_HDL=sv        Synthesise SV with Yosys
-#   make html                         Build Sphinx documentation
-#   make lint                         Run GHDL + vsg (VHDL) and Verilator (SV)
-#   make test-autodoc                 Run hdl_autodoc Python test suite
-#   make clean                        Remove generated artefacts
 # =============================================================================
+
+# ── OSS CAD Suite ─────────────────────────────────────────────────────────────
+# Path to the OSS CAD Suite install (bundles GHDL, Yosys, Verilator, Icarus).
+# Override with: make sim OSS_CAD_SUITE=/path/to/oss-cad-suite
+OSS_CAD_SUITE ?= $(HOME)/tools/oss-cad-suite
+# Mirror what `source environment` does: extend PATH and set tool prefixes.
+export PATH         := $(OSS_CAD_SUITE)/bin:$(OSS_CAD_SUITE)/py3bin:$(PATH)
+export GHDL_PREFIX  ?= $(OSS_CAD_SUITE)/lib/ghdl
+export VERILATOR_ROOT ?= $(OSS_CAD_SUITE)/share/verilator
 
 # ── User-configurable variables ───────────────────────────────────────────────
 # Verification framework: vunit | cocotb
@@ -37,6 +30,11 @@ PYTHON       ?= .venv/bin/python3
 # Bender binary (must be on PATH or set here)
 BENDER       ?= bender
 
+# IceStudio application name / binary
+# macOS: app bundle name passed to `open -a`  (default: IceStudio)
+# Linux: binary name on PATH                   (default: icestudio)
+ICESTUDIO    ?= IceStudio
+
 # Documentation title
 PROJECT      ?= $(notdir $(CURDIR))
 
@@ -46,112 +44,135 @@ SCHEMATICS   ?= 0
 # ── HDL AutoDoc pipeline variables ───────────────────────────────────────────
 AUTODOC_SPHINXBUILD    = $(PYTHON) -m sphinx
 AUTODOC_SOURCEDIR      = docs
-AUTODOC_BUILDDIR       = docs/_build
+AUTODOC_BUILDDIR       = out/docs
 AUTODOC_SCRIPTDIR      = scripts/hdl_autodoc
 AUTODOC_FILELIST       = filelist.f
 AUTODOC_HIERARCHY_JSON = $(AUTODOC_SOURCEDIR)/hierarchy.json
+AUTODOC_LIBDIR         = out/ghdl_libs
 
 # ── Bender-generated file lists (evaluated lazily) ───────────────────────────
 VHDL_RTL  = $(shell $(BENDER) script flist -t rtl_vhdl  --no-default-target 2>/dev/null)
 SV_RTL    = $(shell $(BENDER) script flist -t rtl_sv    --no-default-target 2>/dev/null)
 VHDL_GEN  = $(shell $(BENDER) script flist -t gen_vhdl  --no-default-target 2>/dev/null)
 
+# ── hdl-modules VHDL packages required by the generated register file ─────────
+# Compiled into named libraries before the main sources so that
+# `library axi_lite` and `library register_file` resolve correctly in ghdl.
+HDL_MODULES      = $(shell $(BENDER) path hdl_modules 2>/dev/null)
+VHDL_AXI_LITE    = $(HDL_MODULES)/modules/axi_lite/src/axi_lite_pkg.vhd
+VHDL_REG_FILE    = $(HDL_MODULES)/modules/register_file/src/register_file_pkg.vhd \
+                   $(HDL_MODULES)/modules/register_file/src/axi_lite_register_file.vhd
+
 # =============================================================================
 # Phony targets
 # =============================================================================
-.PHONY: all venv init deps filelist regs \
-        sim sim-vunit sim-cocotb \
-        synth \
+.PHONY: all venv init deps lsp vhdl-ls verible-ls filelist regs \
+        sim sim-vunit sim-vunit-gui sim-cocotb \
+        synth synth-gui impl impl-gui icestudio \
         hierarchy scaffold extract html pdf doc \
         lint lint-vhdl lint-sv \
         test-autodoc \
         clean clean-generated clean-all \
-        help
+        vars help
 
 all: regs sim
 
 # =============================================================================
-# Guards
+# Macros
 # =============================================================================
 
-# check-venv: abort with a clear message if the venv has not been created.
-# Call $(call check-venv) at the top of any target that invokes $(PYTHON).
+# check-venv — abort with a clear message if the venv has not been created.
 define check-venv
 	@test -f .venv/bin/python3 || \
-	  (echo "" && \
-	   echo "ERROR: Python virtual environment not found." && \
-	   echo "       Run 'make venv' first, then retry." && \
-	   echo "" && exit 1)
+	  (printf "\n\033[1;31m  ERROR:\033[0m Python virtual environment not found.\n" && \
+	   printf  "         Run '\033[36mmake venv\033[0m' first, then retry.\n\n" && \
+	   exit 1)
+endef
+
+# compile-ghdl-libs — pre-compile hdl-modules into named GHDL libraries.
+# $(1) = workdir path (will be created if absent)
+define compile-ghdl-libs
+	@mkdir -p $(1)
+	@printf "  \033[2m[ghdl]\033[0m Compiling axi_lite library...\n"
+	@$(OSS_CAD_SUITE)/bin/ghdl -a --std=08 --workdir=$(1) \
+	  --work=axi_lite $(VHDL_AXI_LITE)
+	@printf "  \033[2m[ghdl]\033[0m Compiling register_file library...\n"
+	@$(OSS_CAD_SUITE)/bin/ghdl -a --std=08 --workdir=$(1) \
+	  -P$(1) --work=register_file $(VHDL_REG_FILE)
 endef
 
 # =============================================================================
-# Virtual environment
+# Setup
 # =============================================================================
 
-## venv: Create .venv and install all Python dependencies.
-##        Run once before any other target that uses Python.
-venv:
-	python3 -m venv .venv
-	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install -r requirements.txt
-	@echo ""
-	@echo "Virtual environment ready. No activation needed — targets use .venv/bin/python3 directly."
+##@ Setup
 
-## install: Install/upgrade dependencies into the active venv.
-install:
+venv: ## Create .venv and install all Python deps (run once)
+	@printf "\n\033[1m  Setting up Python virtual environment...\033[0m\n\n"
+	@python3 -m venv .venv
+	@.venv/bin/pip install --upgrade pip -q
+	@.venv/bin/pip install -r requirements.txt -q
+	@printf "\n\033[32m  ✓\033[0m Virtual environment ready — targets use .venv/bin/python3 directly.\n\n"
+
+install: ## Upgrade Python deps in the active venv
 	$(call check-venv)
-	$(PYTHON) -m pip install --upgrade -r requirements.txt
+	@$(PYTHON) -m pip install --upgrade -r requirements.txt -q
 
-# =============================================================================
-# Project initialisation
-# =============================================================================
-
-## init NAME=<name>: Replace all <<NAME>> placeholders and rename files.
-##                    Run once after cloning the template.
-init:
+init: ## Replace <<NAME>> placeholders and rename files  [NAME=<project>  TOPLEVEL_HDL=vhdl|sv]
 	@test -n "$(NAME)" || \
-	  (echo "ERROR: Specify a project name: make init NAME=my_module" && exit 1)
-	bash scripts/init_project.sh $(NAME)
+	  (printf "\n\033[1;31m  ERROR:\033[0m Specify a project name: \033[36mmake init NAME=my_module\033[0m\n\n" && exit 1)
+	@bash scripts/init_project.sh $(NAME) $(TOPLEVEL_HDL)
 
-# =============================================================================
-# Dependency management
-# =============================================================================
+vars: ## Print all current variable values
+	@printf "\n\033[1m  Current variable values\033[0m\n\n"
+	@printf "    \033[36m%-22s\033[0m %s\n" \
+	  "OSS_CAD_SUITE"    "$(OSS_CAD_SUITE)" \
+	  "FRAMEWORK"        "$(FRAMEWORK)" \
+	  "SIM"              "$(SIM)" \
+	  "TOPLEVEL_HDL"     "$(TOPLEVEL_HDL)" \
+	  "TOPLEVEL"         "$(TOPLEVEL)" \
+	  "SCHEMATICS"       "$(SCHEMATICS)" \
+	  "IMPL_FAMILY"      "$(IMPL_FAMILY)" \
+	  "IMPL_DEVICE"      "$(IMPL_DEVICE)" \
+	  "IMPL_PACKAGE"     "$(IMPL_PACKAGE)" \
+	  "IMPL_TOPLEVEL"    "$(IMPL_TOPLEVEL)" \
+	  "IMPL_CONSTRAINT"  "$(IMPL_CONSTRAINT)" \
+	  "ICESTUDIO"        "$(ICESTUDIO)" \
+	  "PYTHON"           "$(PYTHON)"
+	@printf "\n"
 
-## deps: Fetch and vendor all HDL dependencies into deps/ via Bender.
-deps:
-	$(BENDER) update
-	$(BENDER) vendor init
+lsp: vhdl-ls verible-ls ## Generate all LSP config files (vhdl_ls.toml + verible.filelist)
 
-# =============================================================================
-# File list (for hdl_autodoc)
-# =============================================================================
-
-## filelist: Generate filelist.f from Bender (feeds into hdl_autodoc pipeline).
-filelist:
-	bash scripts/gen_filelist.sh > $(AUTODOC_FILELIST)
-
-# =============================================================================
-# Register generation
-# =============================================================================
-
-## regs: Generate VHDL, C header and HTML register files from TOML source.
-##        Outputs land in gen/ (gitignored). Run before sim, synth, or html.
-regs: gen/vhdl/.stamp
-
-gen/vhdl/.stamp: $(wildcard regs/*.toml) scripts/gen_regs.py
+vhdl-ls: ## Generate vhdl_ls.toml for the VHDL Language Server (requires make deps)
 	$(call check-venv)
-	@mkdir -p gen/vhdl gen/sv gen/c
-	$(PYTHON) scripts/gen_regs.py
-	@touch gen/vhdl/.stamp gen/sv/.stamp gen/c/.stamp
+	@$(PYTHON) scripts/gen_vhdl_ls.py
+
+verible-ls: ## Generate verible.filelist for the Verible Language Server (requires make deps)
+	$(call check-venv)
+	@$(PYTHON) scripts/gen_verible_filelist.py
+
+deps: ## Fetch and vendor HDL dependencies into deps/ via Bender
+	@printf "\n\033[1m  Fetching HDL dependencies...\033[0m\n\n"
+	@$(BENDER) update
+	@$(BENDER) vendor init
+	@printf "\n\033[32m  ✓\033[0m Dependencies ready in deps/\n\n"
+
+regs: out/regs/vhdl/.stamp ## Generate VHDL/C/HTML register files from regs/*.toml
+
+out/regs/vhdl/.stamp: $(wildcard regs/*.toml) scripts/gen_regs.py
+	$(call check-venv)
+	@printf "\n\033[1m  Generating register files...\033[0m\n\n"
+	@$(PYTHON) scripts/gen_regs.py
+	@touch out/regs/vhdl/.stamp
+	@printf "\n\033[32m  ✓\033[0m Registers generated in out/regs/\n\n"
 
 # =============================================================================
 # Simulation
 # =============================================================================
 
-## sim: Run simulation. Respects FRAMEWORK= and SIM= variables.
-##       VUnit always uses GHDL (VHDL only).
-##       cocotb dispatches to SIM= based on TOPLEVEL_HDL=.
-sim: regs
+##@ Simulation
+
+sim: regs ## Run simulation  [FRAMEWORK=vunit|cocotb  SIM=ghdl|verilator|icarus]
 ifeq ($(FRAMEWORK),vunit)
 	$(MAKE) sim-vunit
 else ifeq ($(FRAMEWORK),cocotb)
@@ -160,120 +181,341 @@ else
 	$(error Unknown FRAMEWORK=$(FRAMEWORK). Valid: vunit | cocotb)
 endif
 
-## sim-vunit: Run VUnit testbench via GHDL (VHDL only).
-sim-vunit: regs
+sim-vunit: regs ## Run VUnit testbench via GHDL (VHDL only)
 	$(call check-venv)
-	VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py $(VUNIT_ARGS)
+	@printf "\n\033[1m  Running VUnit simulation (GHDL)...\033[0m\n\n"
+	@VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py $(VUNIT_ARGS)
 
-## sim-vunit-gui: Open VUnit testbench in the GHDL waveform viewer.
-sim-vunit-gui: regs
+sim-vunit-gui: regs ## Open VUnit testbench in the GHDL waveform viewer
 	$(call check-venv)
-	VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py --gui $(VUNIT_ARGS)
+	@VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py --gui $(VUNIT_ARGS)
 
-## sim-cocotb: Run cocotb testbench. Passes SIM= and TOPLEVEL_HDL= to tb/cocotb/Makefile.
-sim-cocotb: regs
-	$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL=$(TOPLEVEL) TOPLEVEL_HDL=$(TOPLEVEL_HDL)
+sim-cocotb: regs ## Run cocotb testbench  [SIM=  TOPLEVEL_HDL=vhdl|sv]
+	@printf "\n\033[1m  Running cocotb simulation ($(SIM))...\033[0m\n\n"
+	@$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL)
 
 # =============================================================================
-# Synthesis (Yosys → Xilinx 7-series)
+# Synthesis
 # =============================================================================
 
-## synth: Synthesise with Yosys. Default: VHDL via ghdl-yosys-plugin.
-##         Use TOPLEVEL_HDL=sv for the native SystemVerilog path.
-synth: regs
-	@mkdir -p synth/output
+##@ Synthesis
+
+SYNTH_RDIR = out/reports/synth
+
+synth: regs ## Synthesise with Yosys  [TOPLEVEL_HDL=vhdl|sv]
+	@mkdir -p out/synth $(SYNTH_RDIR)
 ifeq ($(TOPLEVEL_HDL),sv)
-	yosys synth/NAME_sv_xc7.ys
+	@test -n "$(SV_RTL)" || \
+	  (printf "\n\033[1;31m  ERROR:\033[0m Bender returned an empty SV_RTL file list.\n" && \
+	   printf  "         Run '\033[36mmake deps\033[0m' to fetch and lock dependencies.\n\n" && \
+	   exit 1)
+	@printf "\n\033[1m  Synthesising $(TOPLEVEL) (SystemVerilog → Xilinx xc7)...\033[0m\n\n"
+	@yosys -q \
+	  -l $(SYNTH_RDIR)/$(TOPLEVEL)_sv_synth.log \
+	  -p "read_verilog -sv $(SV_RTL)" \
+	  -p "synth_xilinx -family xc7 -top $(TOPLEVEL) -edif out/synth/$(TOPLEVEL)_sv.edif" \
+	  -p "tee -o $(SYNTH_RDIR)/$(TOPLEVEL)_sv_check.txt check" \
+	  -p "tee -o $(SYNTH_RDIR)/$(TOPLEVEL)_sv_util.txt stat -tech xilinx" \
+	  -p "write_json $(SYNTH_RDIR)/$(TOPLEVEL)_sv.json"
+	@printf "\n\033[32m  ✓\033[0m Netlist:  \033[36mout/synth/$(TOPLEVEL)_sv.edif\033[0m\n"
+	@printf "    Reports: \033[36m$(SYNTH_RDIR)/$(TOPLEVEL)_sv_*\033[0m\n\n"
 else
-	yosys synth/NAME_vhdl_xc7.ys
+	@test -n "$(VHDL_RTL)" || \
+	  (printf "\n\033[1;31m  ERROR:\033[0m Bender returned an empty VHDL_RTL file list.\n" && \
+	   printf  "         Run '\033[36mmake deps\033[0m' to fetch and lock dependencies.\n\n" && \
+	   exit 1)
+	@printf "\n\033[1m  Synthesising $(TOPLEVEL) (VHDL → Xilinx xc7)...\033[0m\n\n"
+	$(call compile-ghdl-libs,out/synth/workdir)
+	@printf "  \033[2m[yosys]\033[0m Elaborating and synthesising...\n"
+	@yosys -q \
+	  -l $(SYNTH_RDIR)/$(TOPLEVEL)_vhdl_synth.log \
+	  -p "plugin -i ghdl" \
+	  -p "ghdl --std=08 -Pout/synth/workdir $(VHDL_RTL) $(VHDL_GEN) -e $(TOPLEVEL)" \
+	  -p "synth_xilinx -family xc7 -top $(TOPLEVEL) -edif out/synth/$(TOPLEVEL)_vhdl.edif" \
+	  -p "tee -o $(SYNTH_RDIR)/$(TOPLEVEL)_vhdl_check.txt check" \
+	  -p "tee -o $(SYNTH_RDIR)/$(TOPLEVEL)_vhdl_util.txt stat -tech xilinx" \
+	  -p "write_json $(SYNTH_RDIR)/$(TOPLEVEL)_vhdl.json"
+	@printf "\n\033[32m  ✓\033[0m Netlist:  \033[36mout/synth/$(TOPLEVEL)_vhdl.edif\033[0m\n"
+	@printf "    Reports: \033[36m$(SYNTH_RDIR)/$(TOPLEVEL)_vhdl_*\033[0m\n\n"
+endif
+
+synth-gui: synth ## Open Yosys schematic viewer for the last synthesis  [TOPLEVEL_HDL=vhdl|sv]
+	@printf "\n\033[1m  Opening Yosys schematic viewer...\033[0m\n\n"
+	@$(OSS_CAD_SUITE)/bin/yosys \
+	  -p "read_json $(SYNTH_RDIR)/$(TOPLEVEL)_$(TOPLEVEL_HDL).json; show $(TOPLEVEL)"
+
+# =============================================================================
+# Implementation (nextpnr place-and-route)
+# =============================================================================
+
+# FPGA family for nextpnr.  Determines the synth command, nextpnr binary,
+# constraint file format, and bitstream packer.
+#   ice40   → nextpnr-ice40  + icepack   (constraint: .pcf)
+#   ecp5    → nextpnr-ecp5   + ecppack   (constraint: .lpf)
+#   machxo2 → nextpnr-machxo2 + ddtcmd  (constraint: .lpf)
+IMPL_FAMILY     ?= ice40
+
+# Device and package — must match your physical FPGA.
+# ice40 examples:  IMPL_DEVICE=hx8k   IMPL_PACKAGE=ct256
+#                  IMPL_DEVICE=hx1k   IMPL_PACKAGE=tq144
+# ecp5 examples:   IMPL_DEVICE=lfe5u-25f  IMPL_PACKAGE=CABGA256
+IMPL_DEVICE     ?= hx8k
+IMPL_PACKAGE    ?= ct256
+
+# Top-level module for implementation.  Defaults to NAME_core (not NAME_top)
+# because NAME_top exposes the full AXI-Lite bus which typically exceeds iCE40
+# IO limits.  Override if your design's port count fits the target device IO.
+IMPL_TOPLEVEL   ?= NAME_core
+
+# Constraint file (.pcf for ice40, .lpf for ecp5/machxo2).
+IMPL_CONSTRAINT ?= synth/constraints/$(IMPL_TOPLEVEL).$(if $(filter ecp5 machxo2,$(IMPL_FAMILY)),lpf,pcf)
+
+##@ Implementation
+
+IMPL_RDIR = out/reports/impl
+IMPL_STEM = $(IMPL_TOPLEVEL)_$(IMPL_FAMILY)
+
+impl: regs synth ## Place-and-route with nextpnr  [IMPL_FAMILY=ice40|ecp5  IMPL_DEVICE=  IMPL_PACKAGE=  TOPLEVEL_HDL=vhdl|sv]
+	@mkdir -p out/impl $(IMPL_RDIR)
+	@printf "\n\033[1m  Synthesising $(IMPL_TOPLEVEL) for $(IMPL_FAMILY) ($(IMPL_DEVICE)/$(IMPL_PACKAGE))...\033[0m\n\n"
+ifeq ($(TOPLEVEL_HDL),sv)
+	@test -n "$(SV_RTL)" || \
+	  (printf "\n\033[1;31m  ERROR:\033[0m Bender returned an empty SV_RTL file list.\n" && \
+	   printf  "         Run '\033[36mmake deps\033[0m' to fetch and lock dependencies.\n\n" && \
+	   exit 1)
+	@yosys -q \
+	  -l $(IMPL_RDIR)/$(IMPL_STEM)_synth.log \
+	  -p "read_verilog -sv $(SV_RTL)" \
+	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json"
+else
+	@test -n "$(VHDL_RTL)" || \
+	  (printf "\n\033[1;31m  ERROR:\033[0m Bender returned an empty VHDL_RTL file list.\n" && \
+	   printf  "         Run '\033[36mmake deps\033[0m' to fetch and lock dependencies.\n\n" && \
+	   exit 1)
+	$(call compile-ghdl-libs,out/synth/workdir)
+	@printf "  \033[2m[yosys]\033[0m Elaborating and mapping to $(IMPL_FAMILY)...\n"
+	@yosys -q \
+	  -l $(IMPL_RDIR)/$(IMPL_STEM)_synth.log \
+	  -p "plugin -i ghdl" \
+	  -p "ghdl --std=08 -Pout/synth/workdir $(VHDL_RTL) $(VHDL_GEN) -e $(TOPLEVEL)" \
+	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json"
+endif
+	@printf "  \033[2m[nextpnr]\033[0m Place and route...\n"
+ifeq ($(IMPL_FAMILY),ice40)
+	@$(OSS_CAD_SUITE)/bin/nextpnr-ice40 -q \
+	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
+	  --json   out/impl/$(IMPL_STEM).json \
+	  --pcf    $(IMPL_CONSTRAINT) \
+	  --pcf-allow-unconstrained \
+	  --asc    out/impl/$(IMPL_TOPLEVEL).asc \
+	  --write  $(IMPL_RDIR)/$(IMPL_STEM)_routed.json \
+	  --report $(IMPL_RDIR)/$(IMPL_STEM)_timing.json \
+	  --detailed-timing-report \
+	  --sdf    $(IMPL_RDIR)/$(IMPL_STEM)_routed.sdf \
+	  --placed-svg $(IMPL_RDIR)/$(IMPL_STEM)_placed.svg \
+	  --routed-svg $(IMPL_RDIR)/$(IMPL_STEM)_routed.svg \
+	  -l       $(IMPL_RDIR)/$(IMPL_STEM)_pnr.log
+	@printf "  \033[2m[icepack]\033[0m Packing bitstream...\n"
+	@$(OSS_CAD_SUITE)/bin/icepack out/impl/$(IMPL_TOPLEVEL).asc out/impl/$(IMPL_TOPLEVEL).bit
+else ifeq ($(IMPL_FAMILY),ecp5)
+	@$(OSS_CAD_SUITE)/bin/nextpnr-ecp5 -q \
+	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
+	  --json      out/impl/$(IMPL_STEM).json \
+	  --lpf       $(IMPL_CONSTRAINT) \
+	  --textcfg   out/impl/$(IMPL_TOPLEVEL).config \
+	  --write     $(IMPL_RDIR)/$(IMPL_STEM)_routed.json \
+	  --report    $(IMPL_RDIR)/$(IMPL_STEM)_timing.json \
+	  --detailed-timing-report \
+	  --sdf       $(IMPL_RDIR)/$(IMPL_STEM)_routed.sdf \
+	  --placed-svg $(IMPL_RDIR)/$(IMPL_STEM)_placed.svg \
+	  --routed-svg $(IMPL_RDIR)/$(IMPL_STEM)_routed.svg \
+	  -l          $(IMPL_RDIR)/$(IMPL_STEM)_pnr.log
+	@printf "  \033[2m[ecppack]\033[0m Packing bitstream...\n"
+	@$(OSS_CAD_SUITE)/bin/ecppack --compress out/impl/$(IMPL_TOPLEVEL).config out/impl/$(IMPL_TOPLEVEL).bit
+else ifeq ($(IMPL_FAMILY),machxo2)
+	@$(OSS_CAD_SUITE)/bin/nextpnr-machxo2 -q \
+	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
+	  --json      out/impl/$(IMPL_STEM).json \
+	  --lpf       $(IMPL_CONSTRAINT) \
+	  --textcfg   out/impl/$(IMPL_TOPLEVEL).config \
+	  --write     $(IMPL_RDIR)/$(IMPL_STEM)_routed.json \
+	  --report    $(IMPL_RDIR)/$(IMPL_STEM)_timing.json \
+	  --detailed-timing-report \
+	  --sdf       $(IMPL_RDIR)/$(IMPL_STEM)_routed.sdf \
+	  --placed-svg $(IMPL_RDIR)/$(IMPL_STEM)_placed.svg \
+	  --routed-svg $(IMPL_RDIR)/$(IMPL_STEM)_routed.svg \
+	  -l          $(IMPL_RDIR)/$(IMPL_STEM)_pnr.log
+	@printf "  \033[2m[ddtcmd]\033[0m Packing bitstream...\n"
+	@$(OSS_CAD_SUITE)/bin/ddtcmd -oft -bit -if out/impl/$(IMPL_TOPLEVEL).config -of out/impl/$(IMPL_TOPLEVEL).bit
+else
+	$(error Unknown IMPL_FAMILY=$(IMPL_FAMILY). Valid: ice40 | ecp5 | machxo2)
+endif
+	@printf "\n\033[32m  ✓\033[0m Bitstream: \033[36mout/impl/$(IMPL_TOPLEVEL).bit\033[0m\n"
+	@printf "    Reports: \033[36m$(IMPL_RDIR)/$(IMPL_STEM)_*\033[0m\n\n"
+
+impl-gui: regs synth ## Open nextpnr interactive placement/routing GUI  [IMPL_FAMILY=ice40|ecp5|machxo2  TOPLEVEL_HDL=vhdl|sv]
+	@mkdir -p out/impl $(IMPL_RDIR)
+	@printf "\n\033[1m  Synthesising $(IMPL_TOPLEVEL) for $(IMPL_FAMILY) (GUI mode)...\033[0m\n\n"
+ifeq ($(TOPLEVEL_HDL),sv)
+	@test -n "$(SV_RTL)" || \
+	  (printf "\n\033[1;31m  ERROR:\033[0m Bender returned an empty SV_RTL file list.\n" && \
+	   printf  "         Run '\033[36mmake deps\033[0m' to fetch and lock dependencies.\n\n" && \
+	   exit 1)
+	@$(OSS_CAD_SUITE)/bin/yosys -q \
+	  -l $(IMPL_RDIR)/$(IMPL_STEM)_synth.log \
+	  -p "read_verilog -sv $(SV_RTL)" \
+	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json"
+else
+	@test -n "$(VHDL_RTL)" || \
+	  (printf "\n\033[1;31m  ERROR:\033[0m Bender returned an empty VHDL_RTL file list.\n" && \
+	   printf  "         Run '\033[36mmake deps\033[0m' to fetch and lock dependencies.\n\n" && \
+	   exit 1)
+	$(call compile-ghdl-libs,out/synth/workdir)
+	@printf "  \033[2m[yosys]\033[0m Elaborating and mapping to $(IMPL_FAMILY)...\n"
+	@$(OSS_CAD_SUITE)/bin/yosys -q \
+	  -l $(IMPL_RDIR)/$(IMPL_STEM)_synth.log \
+	  -p "plugin -i ghdl" \
+	  -p "ghdl --std=08 -Pout/synth/workdir $(VHDL_RTL) $(VHDL_GEN) -e $(TOPLEVEL)" \
+	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json"
+endif
+	@printf "  \033[2m[nextpnr]\033[0m Opening GUI...\n\n"
+ifeq ($(IMPL_FAMILY),ice40)
+	@$(OSS_CAD_SUITE)/bin/nextpnr-ice40 --gui \
+	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
+	  --json out/impl/$(IMPL_STEM).json \
+	  --pcf  $(IMPL_CONSTRAINT) \
+	  --pcf-allow-unconstrained
+else ifeq ($(IMPL_FAMILY),ecp5)
+	@$(OSS_CAD_SUITE)/bin/nextpnr-ecp5 --gui \
+	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
+	  --json out/impl/$(IMPL_STEM).json \
+	  --lpf  $(IMPL_CONSTRAINT)
+else ifeq ($(IMPL_FAMILY),machxo2)
+	@$(OSS_CAD_SUITE)/bin/nextpnr-machxo2 --gui \
+	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
+	  --json out/impl/$(IMPL_STEM).json \
+	  --lpf  $(IMPL_CONSTRAINT)
+else
+	$(error Unknown IMPL_FAMILY=$(IMPL_FAMILY). Valid: ice40 | ecp5 | machxo2)
+endif
+
+icestudio: impl ## Run full impl then open IceStudio for device programming
+	@printf "\n\033[1m  Opening IceStudio...\033[0m\n"
+	@printf "    Bitstream: \033[36mout/impl/$(IMPL_TOPLEVEL).bit\033[0m\n\n"
+ifeq ($(shell uname),Darwin)
+	@open -a "$(ICESTUDIO)" 2>/dev/null || \
+	  (printf "\n\033[1;31m  ERROR:\033[0m IceStudio not found.\n" && \
+	   printf  "         Install from \033[36mhttps://icestudio.io\033[0m\n" && \
+	   printf  "         or override: \033[36mmake icestudio ICESTUDIO=/path/to/IceStudio\033[0m\n\n" && \
+	   exit 1)
+else
+	@$(ICESTUDIO) 2>/dev/null || \
+	  (printf "\n\033[1;31m  ERROR:\033[0m IceStudio not found.\n" && \
+	   printf  "         Install from \033[36mhttps://icestudio.io\033[0m\n" && \
+	   printf  "         or override: \033[36mmake icestudio ICESTUDIO=icestudio\033[0m\n\n" && \
+	   exit 1)
 endif
 
 # =============================================================================
-# Documentation (HDL AutoDoc + Sphinx)
+# Documentation
 # =============================================================================
 
-## hierarchy: Parse filelist.f and write docs/hierarchy.json.
-hierarchy: filelist
-	$(call check-venv)
-	$(PYTHON) $(AUTODOC_SCRIPTDIR)/parse_hierarchy.py \
-	  $(AUTODOC_FILELIST) $(AUTODOC_HIERARCHY_JSON)
+##@ Documentation
 
-## scaffold: Generate per-module RST shells (runs hierarchy first).
-scaffold: hierarchy
-	$(PYTHON) $(AUTODOC_SCRIPTDIR)/generate_rst.py \
-	  src $(AUTODOC_SOURCEDIR) "$(PROJECT)"
-
-## extract: Extract FSM, CDC, block and process docs (runs scaffold first).
-extract: scaffold
-	$(PYTHON) $(AUTODOC_SCRIPTDIR)/run_extract.py \
-	  $(AUTODOC_HIERARCHY_JSON) $(AUTODOC_SOURCEDIR) $(AUTODOC_SCRIPTDIR) \
-	  $(if $(filter 1,$(SCHEMATICS)),--schematics)
-	$(PYTHON) $(AUTODOC_SCRIPTDIR)/generate_rst.py \
-	  src $(AUTODOC_SOURCEDIR) "$(PROJECT)"
-
-## html: Build full HTML Sphinx documentation.
-html: regs extract
+html: regs extract ## Build full Sphinx HTML documentation
 	$(call check-venv)
 	@mkdir -p $(AUTODOC_SOURCEDIR)/_static $(AUTODOC_SOURCEDIR)/_templates
-	$(PYTHON) $(AUTODOC_SCRIPTDIR)/include_registers.py .
-	$(AUTODOC_SPHINXBUILD) -M html $(AUTODOC_SOURCEDIR) $(AUTODOC_BUILDDIR)
-	@echo ""
-	@echo "Documentation: $(AUTODOC_BUILDDIR)/html/index.html"
+	@printf "\n\033[1m  Building HTML documentation...\033[0m\n\n"
+	@$(PYTHON) $(AUTODOC_SCRIPTDIR)/include_registers.py . $(AUTODOC_SOURCEDIR)
+	@$(AUTODOC_SPHINXBUILD) -M html $(AUTODOC_SOURCEDIR) $(AUTODOC_BUILDDIR)
+	@printf "\n\033[32m  ✓\033[0m Documentation: \033[36m$(AUTODOC_BUILDDIR)/html/index.html\033[0m\n\n"
 
-## pdf: Build PDF documentation via LaTeX.
-pdf: regs extract
+pdf: regs extract ## Build PDF documentation via LaTeX
 	$(call check-venv)
-	$(PYTHON) $(AUTODOC_SCRIPTDIR)/include_registers.py .
-	$(AUTODOC_SPHINXBUILD) -M latexpdf $(AUTODOC_SOURCEDIR) $(AUTODOC_BUILDDIR)
+	@printf "\n\033[1m  Building PDF documentation...\033[0m\n\n"
+	@$(PYTHON) $(AUTODOC_SCRIPTDIR)/include_registers.py . $(AUTODOC_SOURCEDIR)
+	@$(AUTODOC_SPHINXBUILD) -M latexpdf $(AUTODOC_SOURCEDIR) $(AUTODOC_BUILDDIR)
 
-## doc: Build both HTML and PDF documentation.
-doc: html pdf
+doc: html pdf ## Build both HTML and PDF documentation
+
+# Internal doc pipeline stages (not shown in help)
+filelist:
+	@bash scripts/gen_filelist.sh > $(AUTODOC_FILELIST)
+
+hierarchy: filelist
+	$(call check-venv)
+	@$(PYTHON) $(AUTODOC_SCRIPTDIR)/parse_hierarchy.py \
+	  $(AUTODOC_FILELIST) $(AUTODOC_HIERARCHY_JSON)
+
+scaffold: hierarchy
+	@$(PYTHON) $(AUTODOC_SCRIPTDIR)/generate_rst.py \
+	  src $(AUTODOC_SOURCEDIR) "$(PROJECT)"
+
+extract: scaffold
+ifeq ($(SCHEMATICS),1)
+	@printf "\n\033[1m  Extracting design information (with schematics)...\033[0m\n\n"
+	$(call compile-ghdl-libs,$(AUTODOC_LIBDIR))
+else
+	@printf "\n\033[1m  Extracting design information...\033[0m\n\n"
+endif
+	@$(PYTHON) $(AUTODOC_SCRIPTDIR)/run_extract.py \
+	  $(AUTODOC_HIERARCHY_JSON) $(AUTODOC_SOURCEDIR) $(AUTODOC_SCRIPTDIR) \
+	  $(if $(filter 1,$(SCHEMATICS)),--schematics --ghdl-lib-path $(AUTODOC_LIBDIR))
+	@$(PYTHON) $(AUTODOC_SCRIPTDIR)/generate_rst.py \
+	  src $(AUTODOC_SOURCEDIR) "$(PROJECT)"
 
 # =============================================================================
 # Linting
 # =============================================================================
 
-## lint: Run all linters (VHDL and SV).
-lint: lint-vhdl lint-sv
+##@ Linting
 
-## lint-vhdl: GHDL analysis (type/syntax) + vsg (style guide).
-lint-vhdl:
-	ghdl -a --std=08 --work=work $(VHDL_RTL) $(VHDL_GEN)
-	vsg --configuration vsg.yml --filename $(VHDL_RTL)
+lint: lint-vhdl lint-sv ## Run all linters (VHDL and SV)
 
-## lint-sv: Verilator lint-only pass with all warnings enabled.
-lint-sv:
-	$(BENDER) script verilator -t rtl_sv 2>/dev/null | \
-	  xargs verilator --lint-only --top-module $(TOPLEVEL) -Wall
-
-# =============================================================================
-# Test suite (hdl_autodoc Python unit tests)
-# =============================================================================
-
-## test-autodoc: Run the scripts/hdl_autodoc/tests/ pytest suite.
-test-autodoc:
+lint-vhdl: regs ## GHDL analysis (type/syntax) + vsg style guide
 	$(call check-venv)
-	$(PYTHON) -m pytest
+	@printf "\n\033[1m  Linting VHDL...\033[0m\n\n"
+	$(call compile-ghdl-libs,out/synth/workdir)
+	@$(OSS_CAD_SUITE)/bin/ghdl -a --std=08 --work=work -Pout/synth/workdir $(VHDL_GEN) $(VHDL_RTL)
+	@$(PYTHON) -m vsg --configuration vsg.yml --filename $(VHDL_RTL)
+	@printf "\n\033[32m  ✓\033[0m VHDL lint passed\n\n"
+
+lint-sv: ## Verilator lint-only pass with all warnings enabled
+	@printf "\n\033[1m  Linting SystemVerilog...\033[0m\n\n"
+	@$(BENDER) script verilator -t rtl_sv 2>/dev/null | \
+	  xargs $(OSS_CAD_SUITE)/bin/verilator --lint-only --top-module $(TOPLEVEL) -Wall -Wno-fatal
+	@printf "\n\033[32m  ✓\033[0m SV lint passed\n\n"
+
+# =============================================================================
+# Testing
+# =============================================================================
+
+##@ Testing
+
+test-autodoc: ## Run the scripts/hdl_autodoc/tests/ pytest suite
+	$(call check-venv)
+	@printf "\n\033[1m  Running HDL AutoDoc tests...\033[0m\n\n"
+	@$(PYTHON) -m pytest
 
 # =============================================================================
 # Clean
 # =============================================================================
 
-## clean: Remove Sphinx build output only.
-clean:
-	rm -rf $(AUTODOC_BUILDDIR)
-	$(MAKE) -C tb/cocotb clean 2>/dev/null || true
+##@ Clean
 
-## clean-generated: Remove all always-regenerated files (gen/, synth outputs, filelist.f).
-clean-generated: clean
-	rm -rf gen/ synth/output/ filelist.f waves/
-	find . -name "*.fst" -o -name "*.vcd" -o -name "*.ghw" -o -name "*.vvp" \
+clean: ## Remove build outputs (out/) and sim artefacts
+	@rm -rf out/docs/ out/vunit/ out/cocotb/ out/waves/ out/ghdl_libs/ out/reports/ waves/
+	@$(MAKE) -C tb/cocotb clean 2>/dev/null || true
+
+clean-generated: clean ## Remove all generated files (out/regs/, out/synth/, out/impl/, filelist.f)
+	@rm -rf out/regs/ out/synth/ out/impl/ filelist.f
+	@find . \( -name "*.fst" -o -name "*.vcd" -o -name "*.ghw" -o -name "*.vvp" \) \
 	  | xargs rm -f 2>/dev/null || true
-	rm -f  $(AUTODOC_HIERARCHY_JSON)
-	rm -f  $(AUTODOC_SOURCEDIR)/index.rst $(AUTODOC_SOURCEDIR)/overview.rst
-	rm -f  $(AUTODOC_SOURCEDIR)/hierarchy.rst $(AUTODOC_SOURCEDIR)/hierarchy.dot
-	rm -f  $(AUTODOC_SOURCEDIR)/registers.rst
-	rm -rf $(AUTODOC_SOURCEDIR)/_static/registers
+	@rm -f  $(AUTODOC_HIERARCHY_JSON)
+	@rm -f  $(AUTODOC_SOURCEDIR)/index.rst $(AUTODOC_SOURCEDIR)/overview.rst
+	@rm -f  $(AUTODOC_SOURCEDIR)/hierarchy.rst $(AUTODOC_SOURCEDIR)/hierarchy.dot
+	@rm -f  $(AUTODOC_SOURCEDIR)/registers.rst
+	@rm -rf $(AUTODOC_SOURCEDIR)/_static/registers
 	@if [ -d $(AUTODOC_SOURCEDIR)/modules ]; then \
 	  find $(AUTODOC_SOURCEDIR)/modules -maxdepth 2 \
 	    -name "index.rst" -o -name "fsm.rst" -o -name "timing.rst" \
@@ -287,25 +529,38 @@ clean-generated: clean
 	  | xargs rm -rf 2>/dev/null; \
 	fi
 
-## clean-all: Remove everything including hand-editable RST shells.
-clean-all: clean-generated
-	rm -rf $(AUTODOC_SOURCEDIR)/modules __pycache__ sim_build/
-	rm -rf .venv/ deps/
+clean-all: clean-generated ## Full reset including .venv/ and deps/
+	@rm -rf $(AUTODOC_SOURCEDIR)/modules __pycache__
+	@rm -rf .venv/ deps/
 
 # =============================================================================
 # Help
 # =============================================================================
 
-## help: Print all documented targets.
-help:
-	@echo ""
-	@echo "HDL Template — available targets:"
-	@echo ""
-	@grep -E '^## ' Makefile | sed 's/^## /  make /'
-	@echo ""
-	@echo "Key variables:"
-	@echo "  FRAMEWORK=vunit|cocotb   (default: vunit)"
-	@echo "  SIM=ghdl|verilator|icarus  (default: ghdl)"
-	@echo "  TOPLEVEL_HDL=vhdl|sv     (default: vhdl)"
-	@echo "  NAME=<project>           (required for: make init)"
-	@echo ""
+help: ## Show this help
+	@awk ' \
+	  BEGIN { \
+	    FS = ":.*##"; \
+	    BOLD = "\033[1m"; CYAN = "\033[36m"; DIM = "\033[2m"; \
+	    GREEN = "\033[32m"; YELLOW = "\033[33m"; RESET = "\033[0m"; \
+	    printf "\n%s  HDL Template%s\n", BOLD, RESET; \
+	  } \
+	  /^##@ / { \
+	    printf "\n%s  %s%s\n", BOLD, substr($$0, 5), RESET; next; \
+	  } \
+	  /^[a-zA-Z_%-][a-zA-Z0-9_%-]*:.*## / { \
+	    printf "    %s%-22s%s %s\n", CYAN, $$1, RESET, $$2; \
+	  } \
+	' $(MAKEFILE_LIST)
+	@printf "\n\033[1m  Variables\033[0m\n"
+	@printf "    \033[33m%-22s\033[0m %s\n" \
+	  "FRAMEWORK"       "vunit | cocotb               (default: $(FRAMEWORK))" \
+	  "SIM"             "ghdl | verilator | icarus    (default: $(SIM))" \
+	  "TOPLEVEL_HDL"    "vhdl | sv                    (default: $(TOPLEVEL_HDL))" \
+	  "SCHEMATICS"      "0 | 1                        (default: $(SCHEMATICS))" \
+	  "IMPL_FAMILY"     "ice40 | ecp5 | machxo2       (default: $(IMPL_FAMILY))" \
+	  "IMPL_DEVICE"     "e.g. hx8k, lfe5u-25f         (default: $(IMPL_DEVICE))" \
+	  "IMPL_PACKAGE"    "e.g. ct256, CABGA256          (default: $(IMPL_PACKAGE))" \
+	  "ICESTUDIO"       "app/binary name               (default: $(ICESTUDIO))" \
+	  "NAME"            "<project>  — required for: make init"
+	@printf "\n"

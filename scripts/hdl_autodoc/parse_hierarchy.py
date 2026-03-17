@@ -192,7 +192,7 @@ def build_hierarchy(source_files: list[Path]) -> dict:
         for child in insts:
             if child not in children_of[name]:
                 children_of[name].append(child)
-            if name not in parents_of[child]:
+            if child in parents_of and name not in parents_of[child]:
                 parents_of[child].append(name)
 
     # Detect top-level: module with no parents
@@ -218,16 +218,19 @@ def build_hierarchy(source_files: list[Path]) -> dict:
             "shared":   len(parents_of[name]) > 1,
         }
 
-    return {"top": top, "modules": modules}
+    return {"top": top, "modules": modules, "files": [str(f) for f in source_files]}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Pretty-print hierarchy tree
 # ─────────────────────────────────────────────────────────────────────────────
 
-def print_tree(name: str, modules: dict, prefix: str = "", visited: set = None):
+def print_tree(name: str, modules: dict, prefix: str = "", visited: set | None = None):
     if visited is None:
         visited = set()
+    if name not in modules:
+        print(f"{prefix}{name} [external]")
+        return
     shared_tag = " [shared]" if modules[name]["shared"] else ""
     already    = " (see above)" if name in visited else ""
     print(f"{prefix}{name}{shared_tag}{already}")
@@ -237,7 +240,6 @@ def print_tree(name: str, modules: dict, prefix: str = "", visited: set = None):
     children = modules[name]["children"]
     for i, child in enumerate(children):
         connector = "└── " if i == len(children) - 1 else "├── "
-        extension = "    " if i == len(children) - 1 else "│   "
         print_tree(child, modules, prefix + connector, visited)
 
 

@@ -14,6 +14,7 @@ extensions = [
     "sphinx.ext.graphviz",       # FSM diagrams via graphviz/dot
     "sphinxcontrib.wavedrom",    # .. wavedrom:: directive
     "sphinxvhdl.vhdl",           # vhdl:autoentity:: auto-documentation
+    "sphinxcontrib.rsvgconverter",  # SVG → PDF conversion for LaTeX/PDF builds
 ]
 
 # ── WaveDrom ─────────────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ graphviz_output_format = "svg"
 # Walk up from conf.py to find src/ — works regardless of how deep docs/ is
 _conf_dir = os.path.dirname(os.path.abspath(__file__))
 _root = _conf_dir
+_candidate = os.path.join(_conf_dir, "src")  # default fallback
 for _ in range(6):
     _candidate = os.path.join(_root, "src")
     if os.path.isdir(_candidate):
@@ -50,8 +52,8 @@ html_short_title   = project
 
 html_theme_options = {
     "logo_only":           True,    # show logo instead of project name in sidebar
-    "navigation_depth":    6,
-    "collapse_navigation": False,
+    "navigation_depth":    16,
+    "collapse_navigation": True,
     "sticky_navigation":   True,
     "includehidden":       True,
     "titles_only":         False,
@@ -75,3 +77,16 @@ latex_elements = {
 source_suffix    = ".rst"
 master_doc       = "index"
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+
+# ── sphinx-vhdl incremental-build workaround ─────────────────────────────────
+# sphinx-vhdl lazy-initialises its entity cache via domain.data['autodoc_initialized'].
+# That flag is persisted in Sphinx's environment pickle, so on incremental builds
+# autodoc.init() is never re-called and the module-level entities dict is empty.
+# Reset the flag before every build so entities are always re-parsed from source.
+def _reset_vhdl_autodoc(_app, env, _docnames):
+    if hasattr(env, "domains") and "vhdl" in env.domains:
+        env.domains["vhdl"].data["autodoc_initialized"] = False
+
+
+def setup(app):
+    app.connect("env-before-read-docs", _reset_vhdl_autodoc)

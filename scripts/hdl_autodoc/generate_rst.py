@@ -118,6 +118,46 @@ def load_hierarchy(docs_dir: Path) -> dict | None:
     return json.loads(h_path.read_text())
 
 
+def hierarchy_tree_depth(hierarchy: dict) -> int:
+    """
+    Return the maximum module nesting depth (top = 1, child = 2, …).
+    Cycles are broken by tracking visited names.
+    """
+    modules = hierarchy["modules"]
+
+    def depth(name: str, visited: frozenset) -> int:
+        if name in visited:
+            return 0
+        children = modules.get(name, {}).get("children", [])
+        if not children:
+            return 1
+        return 1 + max(depth(c, visited | {name}) for c in children)
+
+    return depth(hierarchy["top"], frozenset())
+
+
+def toc_maxdepth(hierarchy: dict) -> int:
+    """
+    Compute the root toctree maxdepth that makes every process page visible.
+
+    The sidebar depth contributed by one hardware level is 2 (one for the
+    module index and one for its content pages).  Process pages sit one level
+    deeper than the module's content pages (processes/index) plus one more
+    for the individual process files:
+
+        root(1) → top_index(1) → top_content(2)
+                               → core_index(3) → core_content(4)
+                                               → tx_index(5) → tx_content(6)
+                                                             → processes/(7)
+                                                             → p_baud    (7)
+
+    Formula: 2 * tree_depth + 1  (the +1 covers the processes/ sub-level).
+    A floor of 4 is applied for flat (single-level) designs.
+    """
+    depth = hierarchy_tree_depth(hierarchy)
+    return max(4, 2 * depth + 1)
+
+
 def entity_from_hierarchy(name: str, hmod: dict) -> dict:
     """Build a minimal entity dict from a hierarchy module entry."""
     src_path = Path(hmod["file"])
@@ -155,14 +195,15 @@ def write_always(path: Path, content: str) -> str:
 def module_index_rst(entity: dict, children: list[str],
                      shared_children: set[str],
                      has_processes: bool = True,
-                     is_top: bool = False) -> str:
+                     is_top: bool = False,
+                     sub_maxdepth: int = 4) -> str:
     """Always-regenerated toctree for one module."""
     name  = entity["name"]
     title = name
     lines = [
         title, "=" * len(title), "",
         ".. toctree::",
-        "   :maxdepth: 3",
+        f"   :maxdepth: {sub_maxdepth}",
         "",
         "   entity",
         "   block",
@@ -184,17 +225,12 @@ def module_index_rst(entity: dict, children: list[str],
             "----------",
             "",
             ".. toctree::",
-            "   :maxdepth: 3",
+            "   :maxdepth: 5",
             "   :caption: Submodules",
             "",
         ]
         for child in sorted(children):
-            tag = " *(shared)*" if child in shared_children else ""
-            # Reference sibling module dir
             lines.append(f"   ../{child}/index")
-            if tag:
-                # RST toctree entries can't have inline markup — add note after
-                pass
         lines.append("")
 
         if shared_children & set(children):
@@ -209,15 +245,21 @@ def module_index_rst(entity: dict, children: list[str],
     return "\n".join(lines)
 
 
-def entity_rst(entity: dict, src_rel_to_docs: str = "../../src") -> str:
+def entity_rst(entity: dict, src_file_rel: str = "") -> str:
     name  = entity["name"]
-    fname = entity["file"]
+    fname = entity.get("file", f"{name}.vhd")
     ext   = fname.rsplit(".", 1)[-1].lower()
     is_sv = ext in ("sv", "svh")
     lang  = "systemverilog" if is_sv else "vhdl"
     title = f"{name} — Entity"
+    # src_file_rel is the path from the entity's mod_dir to the source file.
+    # Fall back to fname if not provided (legacy / flat-scan mode).
+    lit_path = src_file_rel if src_file_rel else fname
+    # Caption: prefer relative fname; if it's an absolute path use just the
+    # filename so the caption stays readable.
+    caption = fname if not Path(fname).is_absolute() else Path(fname).name
 
-    lines = [title, "=" * len(title), "", f"Source file: ``src/{fname}``.", ""]
+    lines = [title, "=" * len(title), "", f"Source file: ``{caption}``.", ""]
 
     if not is_sv:
         # sphinx-vhdl only handles VHDL entities
@@ -226,16 +268,16 @@ def entity_rst(entity: dict, src_rel_to_docs: str = "../../src") -> str:
     lines += [
         "Annotated Source",
         "----------------", "",
-        f".. literalinclude:: {src_rel_to_docs}/{fname}",
+        f".. literalinclude:: {lit_path}",
         f"   :language: {lang}",
         "   :linenos:",
-        f"   :caption: src/{fname}",
+        f"   :caption: {caption}",
         "",
     ]
     return "\n".join(lines)
 
 
-def reset_rst(entity: dict, module_dir: Path = None) -> str:
+def reset_rst(entity: dict, module_dir: Path | None = None) -> str:
     name      = entity["name"]
     extracted = module_dir / f"{name}_reset.rst" if module_dir else None
     if extracted and extracted.exists():
@@ -248,7 +290,7 @@ def reset_rst(entity: dict, module_dir: Path = None) -> str:
     ])
 
 
-def block_rst(entity: dict, module_dir: Path = None) -> str:
+def block_rst(entity: dict, module_dir: Path | None = None) -> str:
     name      = entity["name"]
     extracted = module_dir / f"{name}_block.rst" if module_dir else None
     if extracted and extracted.exists():
@@ -261,7 +303,7 @@ def block_rst(entity: dict, module_dir: Path = None) -> str:
     ])
 
 
-def cdc_rst(entity: dict, module_dir: Path = None) -> str:
+def cdc_rst(entity: dict, module_dir: Path | None = None) -> str:
     name        = entity["name"]
     extracted   = module_dir / f"{name}_cdc.rst" if module_dir else None
     if extracted and extracted.exists():
@@ -274,7 +316,7 @@ def cdc_rst(entity: dict, module_dir: Path = None) -> str:
     ])
 
 
-def fsm_rst(entity: dict, module_dir: Path = None) -> str:
+def fsm_rst(entity: dict, module_dir: Path | None = None) -> str:
     name = entity["name"]
     # Only include if the extracted FSM rst actually exists
     if module_dir and (module_dir / f"{name}.rst").exists():
@@ -289,7 +331,7 @@ def fsm_rst(entity: dict, module_dir: Path = None) -> str:
     ])
 
 
-def timing_rst(entity: dict, processes_dir: Path = None) -> str:
+def timing_rst(entity: dict, processes_dir: Path | None = None) -> str:
     name  = entity["name"]
     title = f"{name} — Timing Diagrams"
 
@@ -366,6 +408,9 @@ def hierarchy_dot(hierarchy: dict) -> str:
         "    edge [fontname=Helvetica, fontsize=10];",
         "",
     ]
+    # Style the top module distinctly
+    lines.append(f'    {top} [fillcolor=lightgreen, style="filled,bold"];')
+    lines.append("")
     # Mark shared nodes
     for name, mod in modules.items():
         if mod["shared"]:
@@ -432,18 +477,21 @@ def hierarchy_rst(hierarchy: dict) -> str:
 
 
 def index_rst(entities: list[dict], project_name: str,
-              hierarchy: dict = None) -> str:
+              hierarchy: dict | None = None) -> str:
+    root_depth = toc_maxdepth(hierarchy) if hierarchy else 4
     lines = [
         project_name, "=" * len(project_name), "",
         ".. toctree::",
-        "   :maxdepth: 4",
+        f"   :maxdepth: {root_depth}",
         "   :caption: Contents",
         "",
         "   overview",
     ]
 
     if hierarchy:
-        # Only list the top-level module — it contains submodule toctrees
+        # List only the top module; it nests submodule toctrees beneath it.
+        # maxdepth is computed from the actual hierarchy depth so every process
+        # page is reachable without hardcoding a magic number.
         top = hierarchy["top"]
         lines += [
             f"   modules/{top}/index",
@@ -465,7 +513,7 @@ def index_rst(entities: list[dict], project_name: str,
 
 
 def overview_rst(entities: list[dict], project_name: str,
-                 hierarchy: dict = None) -> str:
+                 hierarchy: dict | None = None) -> str:
     title = f"{project_name} — Overview"
     lines = [
         title, "=" * len(title), "",
@@ -530,6 +578,15 @@ if __name__ == "__main__":
         entities = []
         for name, hmod in hierarchy["modules"].items():
             e = entity_from_hierarchy(name, hmod)
+            # Store the file path relative to src_dir so literalinclude
+            # resolves correctly (e.g. "vhdl/<<NAME>>_tx.vhd" not "<<NAME>>_tx.vhd").
+            src_file = Path(hmod["file"]).resolve()
+            try:
+                e["file"] = str(src_file.relative_to(src_dir.resolve()))
+            except ValueError:
+                # File is outside src_dir (e.g. out/regs/vhdl/) — keep absolute;
+                # the literalinclude call site will use relpath from mod_dir.
+                e["file"] = str(src_file)
             entities.append(e)
     else:
         print("Flat mode: scanning src/")
@@ -542,6 +599,12 @@ if __name__ == "__main__":
 
     # Build lookup by name
     entity_map = {e["name"].lower(): e for e in entities}
+
+    # Pre-compute toc maxdepth from the hierarchy tree so it grows automatically
+    # when deeper designs are added, without any hardcoded magic numbers.
+    sub_maxdepth = toc_maxdepth(hierarchy) if hierarchy else 4
+    print(f"Hierarchy depth: {hierarchy_tree_depth(hierarchy) if hierarchy else 1}, "
+          f"toctree maxdepth: {sub_maxdepth}")
 
     # Shared components set
     shared_names = set()
@@ -564,7 +627,8 @@ if __name__ == "__main__":
             mod_dir / "index.rst",
             module_index_rst(entity, children, shared_names,
                              has_processes=has_processes,
-                             is_top=(hierarchy and name == hierarchy["top"]))
+                             is_top=bool(hierarchy and name == hierarchy["top"]),
+                             sub_maxdepth=sub_maxdepth)
         ))
         results.append(write_always(
             mod_dir / "fsm.rst",
@@ -588,13 +652,21 @@ if __name__ == "__main__":
         ))
 
         # Write-if-missing
-        # literalinclude paths are relative to the RST file itself (mod_dir),
-        # not to docs_dir — compute relpath from mod_dir to src_dir.
+        # literalinclude paths must be relative to the RST file's own directory
+        # (mod_dir).  entity["file"] is now relative to src_dir (set above at
+        # the entities loop), OR an absolute path for files outside src/ (e.g.
+        # out/regs/vhdl/).  Compute a single relpath from mod_dir → source file.
         import os as _os
-        src_rel = _os.path.relpath(src_dir.resolve(), mod_dir.resolve())
+        raw_file = entity.get("file", "")
+        raw_path = Path(raw_file)
+        if raw_path.is_absolute():
+            src_file_abs = raw_path
+        else:
+            src_file_abs = (src_dir / raw_file).resolve()
+        src_file_rel = _os.path.relpath(src_file_abs, mod_dir.resolve())
         results.append(write_if_missing(
             mod_dir / "entity.rst",
-            entity_rst(entity, src_rel_to_docs=src_rel)
+            entity_rst(entity, src_file_rel=src_file_rel)
         ))
 
     # Top-level always-regenerated

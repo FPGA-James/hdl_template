@@ -16,9 +16,9 @@ filesets:
   gen_vhdl:
     description: "Generated VHDL register files (run make regs first)"
     files:
-      - gen/vhdl/NAME_regs_pkg.vhd
-      - gen/vhdl/NAME_register_record_pkg.vhd
-      - gen/vhdl/NAME_register_file_axi_lite.vhd
+      - out/regs/vhdl/NAME_regs_pkg.vhd
+      - out/regs/vhdl/NAME_register_record_pkg.vhd
+      - out/regs/vhdl/NAME_register_file_axi_lite.vhd
     file_type: vhdlSource-2008
 
   rtl_sv:

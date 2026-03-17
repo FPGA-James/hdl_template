@@ -50,7 +50,7 @@ def _run_yosys(args: list[str]) -> tuple[bool, str]:
 
 
 def _synth_vhdl(src: Path, module_name: str, json_path: Path,
-                extra_srcs: list[Path]) -> bool:
+                extra_srcs: list[Path], lib_path: str = "") -> bool:
     if not _have_ghdl_plugin():
         print(f"  ! SCHEMATIC [{module_name}]: ghdl-yosys-plugin not available — skipping")
         return False
@@ -78,8 +78,9 @@ def _synth_vhdl(src: Path, module_name: str, json_path: Path,
         return False
 
     files_str = " ".join(str(f) for f in vhdl_files)
+    lib_flag  = f"-P{lib_path} " if lib_path else ""
     script = (
-        f"ghdl --std=08 {files_str} -e {module_name}; "
+        f"ghdl --std=08 {lib_flag}{files_str} -e {module_name}; "
         f"proc; opt; "
         f"write_json {json_path}"
     )
@@ -147,13 +148,29 @@ if __name__ == "__main__":
         print(f"    Install with: npm install -g netlistsvg")
         sys.exit(0)
 
-    extra_srcs = [Path(f) for f in sys.argv[4:]]
+    # Separate positional extra sources from --ghdl-lib-path flag.
+    positional = []
+    lib_path   = ""
+    remaining  = sys.argv[4:]
+    i = 0
+    while i < len(remaining):
+        if remaining[i] == "--ghdl-lib-path" and i + 1 < len(remaining):
+            lib_path = remaining[i + 1]
+            i += 2
+        elif remaining[i].startswith("--ghdl-lib-path="):
+            lib_path = remaining[i].split("=", 1)[1]
+            i += 1
+        else:
+            positional.append(remaining[i])
+            i += 1
+
+    extra_srcs = [Path(f) for f in positional]
     json_path  = output_dir / f"{module_name}_schematic.json"
     svg_path   = output_dir / f"{module_name}_schematic.svg"
     ext        = src_path.suffix.lower()
 
     if ext in (".vhd", ".vhdl"):
-        ok = _synth_vhdl(src_path, module_name, json_path, extra_srcs)
+        ok = _synth_vhdl(src_path, module_name, json_path, extra_srcs, lib_path)
     elif ext in (".sv", ".svh"):
         ok = _synth_sv(src_path, module_name, json_path, extra_srcs)
     else:
