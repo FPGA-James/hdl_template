@@ -8,9 +8,7 @@
 //
 // For pure SV flows, replace the register port list with your preferred
 // register bus protocol.
-module <<NAME>>_top
-    import <<NAME>>_pkg::*;
-(
+module <<NAME>>_top (
     // System clock, rising-edge triggered.
     input  logic        clk,
     // Synchronous active-low reset.
@@ -48,7 +46,7 @@ module <<NAME>>_top
 
     // Status signals driven by the core back to the register block.
     logic              enabled_s;
-    logic [C_COUNT_W-1:0] pulse_count_s;
+    logic [<<NAME>>_pkg::C_COUNT_W-1:0] pulse_count_s;
 
     // ── u_core: Counter core ─────────────────────────────────────────────────
     <<NAME>>_core u_core (

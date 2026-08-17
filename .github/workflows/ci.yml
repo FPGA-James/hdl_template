@@ -208,6 +208,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-python@v5
         with:
@@ -218,3 +220,42 @@ jobs:
 
       - name: Run pytest
         run: make test-autodoc
+
+  # ── Template smoke test — make init + full pipeline, both languages ──────────
+  # Runs scripts/smoke_test.sh, which every other job here does not: it
+  # exercises the Makefile *after* `make init` has replaced <<NAME>> and
+  # renamed files, which is the only state real users of this template ever
+  # actually build against.
+  smoke-test:
+    name: "Template smoke test (${{ matrix.lang }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lang: [vhdl, sv]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install HDL toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ghdl yosys verilator iverilog graphviz libxcb1
+
+      - name: Install Bender
+        run: |
+          curl -sSL https://github.com/pulp-platform/bender/releases/latest/download/bender-linux-x86_64.tar.gz \
+            | tar -xz -C /usr/local/bin/
+
+      - name: Install NVC
+        run: |
+          curl -sSL -o nvc.deb https://github.com/nickg/nvc/releases/download/r1.22.1/nvc_1.22.1-1_amd64_ubuntu-24.04.deb
+          sudo apt-get install -y ./nvc.deb
+
+      - name: Run smoke test
+        run: bash scripts/smoke_test.sh ${{ matrix.lang }}

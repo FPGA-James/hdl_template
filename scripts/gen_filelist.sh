@@ -34,7 +34,13 @@ bender_flist() {
 }
 
 # ── VHDL RTL sources ──────────────────────────────────────────────────────────
-if ! bender_flist rtl_vhdl; then
+if bender_flist rtl_vhdl; then
+    # Generated register packages must also be listed so parse_hierarchy.py
+    # can resolve entities instantiated from <<NAME>>_top (e.g.
+    # <<NAME>>_register_file_axi_lite) — otherwise it KeyErrors on a child
+    # module it never saw. Emitted only if `make regs` has already run.
+    bender_flist gen_vhdl || true
+else
     echo "# (Bender unavailable or deps not fetched — using direct file list)"
     echo ""
     # Generated register packages (emit if out/regs/vhdl exists and has files)

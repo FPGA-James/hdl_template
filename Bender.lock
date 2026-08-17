@@ -1,0 +1,7 @@
+packages:
+  hdl_modules:
+    revision: c4f01c4bb69aab66c879f545e80abb477f1ebf35
+    version: 6.2.1
+    source:
+      Git: https://github.com/hdl-modules/hdl-modules.git
+    dependencies: []

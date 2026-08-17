@@ -21,19 +21,18 @@ vu = VUnit.from_argv(compile_builtins=False)
 vu.add_vhdl_builtins()
 
 # ── RTL library ──────────────────────────────────────────────────────────────
-rtl_lib = vu.add_library("work")
+rtl_lib = vu.add_library("rtl_lib")
 
-rtl_lib.add_source_files(ROOT / "src" / "vhdl" / "NAME_pkg.vhd")
-rtl_lib.add_source_files(ROOT / "src" / "vhdl" / "NAME_core.vhd")
+rtl_lib.add_source_files(ROOT / "src" / "<<NAME>>_pkg.vhd")
+rtl_lib.add_source_files(ROOT / "src" / "<<NAME>>_core.vhd")
 
-# Generated register packages (run `make regs` first).
-# NAME_top.vhd is not included here because the testbench targets NAME_core
-# directly; the AXI-Lite register file requires the hdl-modules library.
-for gen_file in sorted((ROOT / "gen" / "vhdl").glob("*.vhd")):
-    rtl_lib.add_source_files(gen_file)
+# <<NAME>>_top.vhd (and the generated register packages) are not included
+# here because the testbench targets <<NAME>>_core directly; the AXI-Lite
+# register file requires the hdl-modules library, which this narrow-scope
+# unit test has no need for.
 
 # ── Testbench library ─────────────────────────────────────────────────────────
 tb_lib = vu.add_library("tb_lib")
-tb_lib.add_source_files(ROOT / "tb" / "vunit" / "vhdl" / "NAME_tb.vhd")
+tb_lib.add_source_files(ROOT / "tb" / "vunit" / "vhdl" / "<<NAME>>_tb.vhd")
 
 vu.main()

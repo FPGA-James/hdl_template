@@ -1,11 +1,11 @@
 /* =============================================================================
    HDL AutoDoc — Catppuccin Theme
-   
+
    Light mode: Catppuccin Latte
    Dark mode:  Catppuccin Mocha
-   
+
    Style guide: https://github.com/catppuccin/catppuccin/blob/main/docs/style-guide.md
-   
+
    Mapping (applied to both flavours per style guide):
      Background pane      → Base
      Secondary panes      → Mantle, Crust
@@ -79,12 +79,6 @@
   --tip:            var(--ctp-teal);       /* Tips / hints            */
   --selection-bg:   rgba(148, 156, 187, 0.25); /* Overlay2 @ 25%     */
 
-  /* Sidebar always uses dark Frappé tones for contrast */
-  --sidebar-bg:     var(--ctp-crust);
-  --sidebar-text:   var(--ctp-subtext0);
-  --sidebar-hi:     var(--ctp-text);
-  --sidebar-active: var(--ctp-blue);
-
   /* Code block uses deepest surface */
   --code-bg:        var(--ctp-mantle);
   --code-text:      var(--ctp-text);
@@ -94,12 +88,12 @@
   --f-size:  15px;
   --radius:  6px;
   --shadow:  0 1px 3px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.1);
-  --content-max: clamp(640px, calc(100vw - 300px), 1800px);
   --transition: 0.2s ease;
 }
 
 
 /* ── Catppuccin Mocha — Dark mode ────────────────────────────────────────── */
+/* Furo sets data-theme="dark" on <html> — same selector, activates automatically */
 [data-theme="dark"] {
   /* Full Mocha palette */
   --ctp-rosewater:  #f5e0dc;
@@ -151,11 +145,6 @@
   --tip:            var(--ctp-teal);
   --selection-bg:   rgba(147, 153, 178, 0.25);
 
-  --sidebar-bg:     var(--ctp-crust);
-  --sidebar-text:   var(--ctp-subtext0);
-  --sidebar-hi:     var(--ctp-text);
-  --sidebar-active: var(--ctp-blue);
-
   --code-bg:        var(--ctp-crust);
   --code-text:      var(--ctp-text);
 }
@@ -171,7 +160,6 @@ html {
 body {
   font-family: var(--f-body);
   font-size: var(--f-size);
-  background: var(--bg) !important;
   color: var(--text);
   line-height: 1.7;
 }
@@ -186,132 +174,10 @@ code, pre, tt, kbd, samp, .highlight {
 }
 
 
-/* ── Full-width layout ────────────────────────────────────────────────────── */
-.wy-nav-content-wrap {
-  background: var(--bg) !important;
-  transition: background var(--transition);
-}
-
-.wy-nav-content {
-  max-width: none !important;
-  background: var(--bg) !important;
-  color: var(--text) !important;
-  padding: 2rem 2.5rem !important;
-  transition: background var(--transition), color var(--transition);
-}
-
-.wy-nav-content > .rst-content {
-  max-width: var(--content-max);
-  margin: 0 auto;
-}
-
-.rst-content, .document, .section, .body {
-  color: var(--text);
-  background: transparent;
-}
-
-
-/* ── Sidebar ──────────────────────────────────────────────────────────────── */
-.wy-nav-side {
-  background: var(--sidebar-bg) !important;
-  border-right: 1px solid var(--bg-tertiary);
-  transition: background var(--transition);
-}
-
-.wy-side-nav-search {
-  background: var(--bg-secondary) !important;
-  border-bottom: 1px solid var(--bg-tertiary) !important;
-}
-
-.wy-side-nav-search input[type=text] {
-  background: var(--surface-0) !important;
-  border: 1px solid var(--surface-1) !important;
-  color: var(--text) !important;
-  border-radius: var(--radius) !important;
-  font-family: var(--f-mono) !important;
-  font-size: 0.85em !important;
-}
-
-.wy-side-nav-search input[type=text]::placeholder {
-  color: var(--overlay-0) !important;
-}
-
-/* Nav links */
-.wy-menu-vertical a {
-  color: var(--sidebar-text) !important;
-  font-size: 0.875em !important;
-  transition: color var(--transition), background var(--transition);
-}
-
-.wy-menu-vertical a:hover {
-  background: var(--surface-0) !important;
-  color: var(--sidebar-hi) !important;
-}
-
-.wy-menu-vertical li.current > a {
-  background: var(--surface-0) !important;
-  color: var(--sidebar-hi) !important;
-  border-right: 3px solid var(--sidebar-active) !important;
-  font-weight: 600;
-}
-
-.wy-menu-vertical li.current li a {
-  background: transparent !important;
-  color: var(--sidebar-text) !important;
-}
-
-.wy-menu-vertical li.current li a:hover {
-  background: var(--surface-0) !important;
-  color: var(--sidebar-hi) !important;
-}
-
-/* Toctree captions */
-.wy-menu-vertical p.caption {
-  color: var(--overlay-0) !important;
-  font-size: 0.7em !important;
-  letter-spacing: 0.12em !important;
-  text-transform: uppercase !important;
-  font-family: var(--f-mono) !important;
-  padding: 1.2em 1em 0.3em !important;
-}
-
-
-/* ── Sidebar brand ────────────────────────────────────────────────────────── */
-.hdl-sidebar-brand {
-  padding: 1.25rem 1rem 1rem;
-  border-bottom: 1px solid var(--bg-tertiary);
-  margin-bottom: 0.5rem;
-}
-
-.hdl-logo {
-  display: block;
-  max-width: 80px;
-  margin: 0 auto 0.6rem;
-}
-
-.hdl-project-name {
-  display: block;
-  color: var(--sidebar-hi);
-  font-size: 1em;
-  font-weight: 700;
-  text-align: center;
-  letter-spacing: 0.01em;
-}
-
-.hdl-project-version {
-  display: block;
-  color: var(--overlay-1);
-  font-size: 0.72em;
-  text-align: center;
-  font-family: var(--f-mono);
-  margin-top: 2px;
-}
-
-
 /* ── Headings — Text per style guide ─────────────────────────────────────── */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--f-body);
-  color: var(--text);          /* Main headlines → Text */
+  color: var(--text);
   transition: color var(--transition);
 }
 
@@ -329,41 +195,27 @@ h2 {
   border-bottom: 1px solid var(--surface-1);
   padding-bottom: 0.3em;
   margin-top: 2em;
-  color: var(--subtext-1);     /* Sub-headlines → Subtext 1 */
+  color: var(--subtext-1);
 }
 
 h3 {
   font-size: 1.15em;
-  color: var(--subtext-0);     /* Labels → Subtext 0 */
+  color: var(--subtext-0);
 }
 
 h4, h5, h6 {
-  color: var(--overlay-2);     /* Subtle → Overlay 1/2 */
+  color: var(--overlay-2);
 }
 
 
 /* ── Links — Blue per style guide ────────────────────────────────────────── */
 a {
-  color: var(--accent);        /* Links/URLs → Blue */
+  color: var(--accent);
   text-decoration: none;
   transition: opacity var(--transition);
 }
 
 a:hover { opacity: 0.8; text-decoration: underline; }
-
-
-/* ── Breadcrumbs ──────────────────────────────────────────────────────────── */
-.wy-breadcrumbs {
-  background: var(--bg-secondary) !important;
-  border-bottom: 1px solid var(--surface-0);
-  padding: 0.5rem 1rem;
-  font-size: 0.82em;
-  font-family: var(--f-mono);
-  transition: background var(--transition);
-}
-
-.wy-breadcrumbs a   { color: var(--accent); }
-.wy-breadcrumbs li  { color: var(--subtext-0); }
 
 
 /* ── Code blocks ──────────────────────────────────────────────────────────── */
@@ -384,7 +236,7 @@ div[class^="highlight"] pre,
 /* Inline code */
 code.literal, tt.literal {
   background: var(--surface-0);
-  color: var(--ctp-peach);     /* Peach is a great inline-code accent */
+  color: var(--ctp-peach);
   border: 1px solid var(--surface-1);
   border-radius: 3px;
   padding: 1px 6px;
@@ -398,7 +250,7 @@ table.docutils {
   width: 100%;
   border-collapse: collapse;
   background: transparent;
-  border: 1px solid var(--surface-0);   /* Softer outer border */
+  border: 1px solid var(--surface-0);
   border-radius: var(--radius);
   overflow: hidden;
   font-size: 0.9em;
@@ -406,21 +258,20 @@ table.docutils {
 }
 
 table.docutils th {
-  background: transparent;              /* No fill — just a bottom rule */
-  color: var(--overlay-2);             /* Muted header text, not full Subtext */
+  background: transparent;
+  color: var(--overlay-2);
   font-weight: 600;
   font-family: var(--f-mono);
   font-size: 0.78em;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   padding: 0.55rem 1rem;
-  border-bottom: 1px solid var(--surface-1);  /* Single thin rule, not double */
+  border-bottom: 1px solid var(--surface-1);
 }
 
-/* Use .rst-content prefix to match RTD theme specificity */
-.rst-content table.docutils td,
-.rst-content table.docutils tr:nth-child(odd) td,
-.rst-content table.docutils tr:nth-child(even) td {
+table.docutils td,
+table.docutils tr:nth-child(odd) td,
+table.docutils tr:nth-child(even) td {
   padding: 0.55rem 1rem;
   border-bottom: 1px solid var(--surface-0) !important;
   color: var(--text) !important;
@@ -429,23 +280,21 @@ table.docutils th {
   transition: color var(--transition), border-color var(--transition);
 }
 
-.rst-content table.docutils tr:last-child td { border-bottom: none !important; }
+table.docutils tr:last-child td { border-bottom: none !important; }
 
 /* Gentle stripe */
-.rst-content table.docutils tr:nth-child(even) td {
+table.docutils tr:nth-child(even) td {
   background: rgba(124, 127, 147, 0.06) !important;
 }
 
-.rst-content table.docutils tr:hover td {
+table.docutils tr:hover td {
   background: var(--selection-bg) !important;
 }
-
-
 
 table.docutils td:first-child {
   font-family: var(--f-mono);
   font-weight: 600;
-  color: var(--subtext-1);     /* Softer than full accent blue */
+  color: var(--subtext-1);
 }
 
 
@@ -555,7 +404,7 @@ p.rubric {
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--subtext-1);     /* Sub-headlines → Subtext 1 */
+  color: var(--subtext-1);
   border-left: 3px solid var(--accent);
   padding-left: 0.75rem;
   margin-top: 2em;
@@ -564,8 +413,8 @@ p.rubric {
 
 /* ── Build badge ─────────────────────────────────────────────────────────── */
 .hdl-build-badge {
-  background: var(--accent);   /* Tags/pills → Blue */
-  color: var(--on-accent);     /* On-accent → Base */
+  background: var(--accent);
+  color: var(--on-accent);
   padding: 2px 8px;
   border-radius: 3px;
   font-size: 0.78em;
@@ -583,7 +432,7 @@ p.rubric {
   background: var(--bg-secondary);
   border-top: 1px solid var(--surface-0);
   font-size: 0.78em;
-  color: var(--overlay-1);     /* Subtle → Overlay 1 */
+  color: var(--overlay-1);
   flex-wrap: wrap;
   gap: 0.5rem;
   font-family: var(--f-mono);
@@ -594,86 +443,134 @@ p.rubric {
 .hdl-footer a:hover { text-decoration: underline; }
 
 
-/* ── Dark mode toggle (floating pill, bottom-right) ──────────────────────── */
-#hdl-toggle {
-  position: fixed;
-  bottom: 1.75rem;
-  right: 1.75rem;
-  z-index: 99999;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.9rem 0.45rem 0.5rem;
-  background: var(--surface-1);
-  border: 1px solid var(--surface-2);
-  border-radius: 2rem;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-  font-family: var(--f-mono);
-  font-size: 0.78em;
+/* ── Coverage table ──────────────────────────────────────────────────────── */
+
+.coverage-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+  font-family: var(--f-body);
+  font-size: 0.9em;
+}
+
+.coverage-table th,
+.coverage-table td {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--surface-0);
+  text-align: center;
+}
+
+.coverage-table th:first-child,
+.coverage-table td:first-child {
+  text-align: left;
+}
+
+.coverage-table thead tr {
+  background: var(--bg-secondary);
   font-weight: 600;
   color: var(--subtext-1);
-  letter-spacing: 0.04em;
-  transition: transform 0.15s ease, box-shadow 0.15s ease,
-              background var(--transition), border-color var(--transition);
 }
 
-#hdl-toggle:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-  color: var(--text);
+.coverage-table tfoot tr {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  color: var(--subtext-1);
 }
 
-.hdl-toggle-track {
-  position: relative;
-  width: 2.4rem;
-  height: 1.3rem;
-  background: var(--surface-0);
-  border: 1px solid var(--surface-2);
-  border-radius: 1rem;
-  display: flex;
-  align-items: center;
-  transition: background var(--transition);
-  flex-shrink: 0;
+.cov-yes {
+  background: color-mix(in srgb, var(--ctp-green) 18%, transparent);
+  color: var(--success);
+  font-weight: 600;
 }
 
-.hdl-toggle-track[data-dark="1"] {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.hdl-toggle-thumb {
-  position: absolute;
-  left: 2px;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 50%;
-  background: var(--ctp-text);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  transition: left 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.hdl-toggle-track[data-dark="1"] .hdl-toggle-thumb {
-  left: calc(100% - 1.1rem);
-  background: var(--on-accent);  /* On-accent → Base */
-}
-
-.hdl-toggle-icon-sun,
-.hdl-toggle-icon-moon {
-  position: absolute;
-  font-size: 0.65rem;
-  line-height: 1;
-  transition: opacity 0.2s;
-  pointer-events: none;
-}
-
-.hdl-toggle-icon-sun  { right: 3px; opacity: 0; }
-.hdl-toggle-icon-moon { left: 3px;  opacity: 1; }
-
-.hdl-toggle-track[data-dark="1"] .hdl-toggle-icon-sun  { opacity: 1; }
-.hdl-toggle-track[data-dark="1"] .hdl-toggle-icon-moon { opacity: 0; }
-
-.hdl-toggle-label {
+.cov-no {
+  background: color-mix(in srgb, var(--surface-0) 60%, transparent);
   color: var(--overlay-1);
-  user-select: none;
+}
+
+.cov-count {
+  background: color-mix(in srgb, var(--ctp-blue) 12%, transparent);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ── Bus-group port table ─────────────────────────────────────────────────── */
+
+.port-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+  font-family: var(--f-body);
+  font-size: 0.9em;
+}
+
+.port-table th,
+.port-table td {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--surface-0);
+  text-align: left;
+}
+
+.port-table thead tr {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  color: var(--subtext-1);
+}
+
+.bus-group-row td {
+  background: var(--surface-1);
+  padding: 0;
+}
+
+.bus-group-row summary {
+  cursor: pointer;
+  padding: 0.45rem 0.8rem;
+  font-family: var(--f-mono);
+}
+
+.bus-ports-inner {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  margin: 0.25rem 0 0.25rem 1.5rem;
+}
+
+.bus-ports-inner td {
+  padding: 0.3rem 0.6rem;
+  border: none;
+  border-bottom: 1px solid var(--surface-0);
+}
+
+/* ── Layout — sidebar, content, and TOC widths ───────────────────────────── */
+/* Furo default: sidebar-drawer = calc(50% - 18.5em) which is ~26em on 1440px,
+   but the actual nav (sidebar-container) is only 15em — the rest is dead background.
+   Fix: cap the drawer at 20em so only ~5em of background flanks the nav.
+   Content: flex:1 fills the remaining space up to 68em (Furo default is 46em).
+   Main: space-between so that once content hits max-width, the free space is split
+   evenly between left and right gaps — keeping sidebar left, TOC right, content centred. */
+.main {
+  justify-content: space-between;
+}
+.sidebar-drawer {
+  width: 20em;
+  min-width: 15em;
+}
+.content {
+  flex: 1;
+  max-width: 68em;
+  min-width: 0;
+}
+
+
+/* ── Register map tables ──────────────────────────────────────────────────── */
+
+table.register-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+table.register-table th,
+table.register-table td {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }

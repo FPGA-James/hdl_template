@@ -18,7 +18,7 @@ sphinx>=7.0,<9.0
 # Pin docutils — sphinx-vhdl 0.2.x has a transition-node bug with docutils 0.21+
 docutils>=0.18,<0.21
 
-sphinx-rtd-theme>=2.0
+furo>=2025.12.19
 
 # WaveDrom timing diagrams via .. wavedrom:: directive in VHDL comments
 sphinxcontrib-wavedrom>=3.0

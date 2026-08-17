@@ -10,15 +10,22 @@ Open-source HDL project template supporting both VHDL and SystemVerilog. All wor
 
 All HDL tools (GHDL, Yosys, Verilator, Icarus, nextpnr) are expected to come from **OSS CAD Suite**, installed at `~/tools/oss-cad-suite` by default. Override with `make <target> OSS_CAD_SUITE=/path/to/oss-cad-suite`.
 
+**NVC** (VHDL simulator) is a separate dependency, used only by `make sim-native TOPLEVEL_HDL=vhdl` — it's not bundled in OSS CAD Suite. Install via `brew install nvc` or see https://www.nickg.me.uk/nvc/. Override with `make sim-native NVC=/path/to/nvc`.
+
+**Known macOS gap**: `make html`/`make pdf`/`make coverage` can crash on import with `OSError: cannot load library 'libxcb.dylib'`. This is `sphinxcontrib.wavedrom` unconditionally importing `cairosvg` → `cairocffi` → `xcffib` at module-import time — `xcffib` needs `libxcb.dylib` resolvable via `cffi`'s `dlopen()`, which behaves differently from `ctypes.util.find_library()` and isn't satisfied by `brew install cairo` alone (`DYLD_LIBRARY_PATH=/opt/homebrew/lib` fixes `find_library()` but not the `make`-spawned Sphinx subprocess, likely SIP stripping `DYLD_*`). This triggers regardless of whether the project actually uses any `.. wavedrom::` directive or `SCHEMATICS=1`. Third-party packaging issue (`xcffib`/`cairocffi` on macOS), not fixable by editing this repo. Untested whether Linux CI hits the same gap.
+
 ## Initial Setup (one-time)
 
 ```bash
+git submodule update --init --recursive         # Fetch the HDLAutoDoc submodule (needed for make html/pdf/test-autodoc)
 make init NAME=<project_name>                    # VHDL project (default)
 make init NAME=<project_name> TOPLEVEL_HDL=sv   # SystemVerilog project
 make venv                        # Create .venv/ and install Python dependencies
-make deps                        # Fetch HDL dependencies into deps/ via Bender
+make deps                        # Fetch HDL dependencies via Bender (bender update)
 make regs                        # Generate VHDL/C/HTML from regs/<name>_regs.toml
 ```
+
+Cloning fresh? Use `git clone --recurse-submodules <url>` to skip the separate submodule step above.
 
 ## Common Commands
 
@@ -28,6 +35,8 @@ make sim                                              # VUnit + GHDL (VHDL, defa
 make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl # cocotb + GHDL (VHDL)
 make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv  # cocotb + Verilator (SV)
 make sim FRAMEWORK=cocotb SIM=icarus   TOPLEVEL_HDL=sv   # cocotb + Icarus (SV)
+make sim-native TOPLEVEL_HDL=vhdl                         # Native VHDL via NVC, no framework
+make sim-native TOPLEVEL_HDL=sv                           # Native SV via Verilator --binary, no framework
 
 # Single VUnit test
 VUNIT_SIMULATOR=ghdl .venv/bin/python tb/vunit/run.py -v "tb_lib.NAME_tb.test_count_up"
@@ -65,7 +74,7 @@ make regs                   # Generate from all regs/*.toml
 make test-autodoc           # hdl_autodoc Python unit tests (pytest)
 
 # Dependency management
-make deps                   # bender update + bender vendor init → deps/
+make deps                   # bender update (resolved via `bender path <name>`, not vendored)
 make install                # Upgrade Python dependencies in active venv
 
 # Diagnostics
@@ -74,7 +83,7 @@ make vars                   # Print all current Makefile variable values
 # Clean
 make clean                  # Remove out/docs/, sim artefacts
 make clean-generated        # Also remove out/regs/, out/synth/, out/impl/, filelist.f
-make clean-all              # Full reset including .venv/ and deps/
+make clean-all              # Full reset including .venv/
 ```
 
 ## Architecture
@@ -103,6 +112,7 @@ out/             GENERATED outputs (gitignored)
   out/regs/html/ HTML register documentation
 tb/vunit/        VUnit runner (run.py) + VHDL testbenches
 tb/cocotb/       cocotb Makefile + Python test modules
+tb/native/       Framework-less testbenches (tb/native/vhdl, tb/native/sv) run directly by NVC / Verilator
 synth/           Yosys synthesis scripts (.ys) + XDC constraints
 scripts/
   hdl_autodoc/   HDL AutoDoc extraction pipeline (unchanged from HDLAutoDoc)
@@ -110,7 +120,6 @@ scripts/
   gen_filelist.sh Bender → filelist.f for hdl_autodoc
   init_project.sh Template initialisation (replaces <<NAME>>)
 docs/            Sphinx documentation source (RST shells + conf.py)
-deps/            External HDL repos fetched by Bender (gitignored)
 ```
 
 ### Dependency Management
@@ -123,6 +132,8 @@ deps/            External HDL repos fetched by Bender (gitignored)
 
 **FuseSoC** (`template.core`) is a secondary manifest kept in sync with `Bender.yml` for ecosystem compatibility.
 
+`hdl_modules` (declared under `dependencies:`) has no `Bender.yml` of its own — Bender still checks it out via `bender update` and resolves it with `bender path hdl_modules`, which the Makefile uses to locate `axi_lite_pkg.vhd`/`register_file_pkg.vhd` for GHDL library compilation (`HDL_MODULES`/`VHDL_AXI_LITE`/`VHDL_REG_FILE` in the Makefile). There is no `deps/` vendoring step — `make deps` is just `bender update`; the checkout lives in Bender's own `.bender/` cache (gitignored).
+
 ### Simulator / Framework Routing
 
 | `FRAMEWORK` | `SIM`      | `TOPLEVEL_HDL` | Mechanism             |
@@ -133,6 +144,8 @@ deps/            External HDL repos fetched by Bender (gitignored)
 | `cocotb`    | icarus     | sv             | cocotb → iverilog VPI |
 
 The `tb/cocotb/Makefile` enforces valid combinations with an error guard.
+
+`make sim-native TOPLEVEL_HDL=vhdl|sv` is a separate, framework-less path — it compiles and runs `tb/native/vhdl/NAME_tb.vhd` directly with NVC, or `tb/native/sv/NAME_tb.sv` directly with `verilator --binary --timing`, with no VUnit/cocotb dependency. Both testbenches target `<<NAME>>_core` directly (not `_top`), matching the VUnit and cocotb testbenches, so the AXI-Lite register block and `hdl-modules` are not involved.
 
 ### Register Generation
 
@@ -146,6 +159,8 @@ Register definitions live in `regs/<name>_regs.toml` using the `hdl_registers` T
 The generated AXI-Lite entity requires the `hdl-modules` library (fetched via `make deps`).
 
 ### Documentation Pipeline
+
+The HDL AutoDoc scripts themselves live in the `submodules/HDLAutoDoc` git submodule (not vendored into `scripts/`) — `AUTODOC_SCRIPTDIR` in the Makefile points there directly, so updates come from `git submodule update --remote`. `docs/conf.py`, `docs/_static/`, and `docs/_templates/` are project-owned copies (not referenced from the submodule), since they carry local customisations — see the note in `docs/conf.py` before syncing theme/template changes from upstream.
 
 The `make html` target runs the full HDL AutoDoc + Sphinx pipeline:
 1. `make filelist` — generates `filelist.f` from Bender
@@ -174,7 +189,9 @@ After `make init`, `src/` is flat (no language subdirectories), `<<NAME>>` and `
 - `scripts/gen_regs.py` — register generation driver
 - `scripts/init_project.sh` — project initialisation
 - `docs/conf.py` — Sphinx configuration (project name, extensions, theme)
+- `submodules/HDLAutoDoc` — git submodule; source of the HDL AutoDoc extraction/generation scripts (`scripts/gen_regs.py` and `docs/` remain project-owned)
 - `vsg.yml` — VHDL Style Guide linter rules
-- `.github/workflows/ci.yml` — CI matrix (lint, sim×4, synth, test-autodoc); includes a `regs` job that regenerates and diffs register files to catch uncommitted drift
+- `.github/workflows/ci.yml` — CI matrix (lint, sim×4, synth, test-autodoc); includes a `regs` job that regenerates and diffs register files to catch uncommitted drift, and a `smoke-test` job (vhdl/sv matrix) that runs `scripts/smoke_test.sh` — the only job that exercises the Makefile *after* `make init`, which is the state real users actually build against
+- `scripts/smoke_test.sh` — copies the working tree into an isolated temp dir per language, runs `make init`, then walks `regs`/`lsp`/`lint`/every testbench flow/`synth`/`html`/`coverage`. Runs every step regardless of earlier failures and prints a full pass/fail summary (`scripts/smoke_test.sh [vhdl|sv]`, `KEEP=1` to keep the temp dirs)
 - `.github/workflows/docs.yml` — Sphinx → GitHub Pages deployment (main branch only)
 - `.python-version` — pins Python 3.13 for venv and CI

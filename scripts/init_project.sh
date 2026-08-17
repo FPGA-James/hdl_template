@@ -56,6 +56,7 @@ EXCLUDE_PATHS=(
     "./deps"
     "./.git"
     "./out"
+    "./submodules"
 )
 
 # Build find -prune expression
@@ -103,7 +104,6 @@ for subdir in vhdl sv; do
         fi
     done < <(find . \
         "${PRUNE_EXPR[@]}" \
-        -print \
         \( \
             -name "*.yml" -o -name "*.yaml" -o -name "*.core" \
             -o -name "*.md"  -o -name "*.rst" -o -name "*.py"  \
@@ -125,7 +125,6 @@ while IFS= read -r -d '' f; do
     fi
 done < <(find . \
     "${PRUNE_EXPR[@]}" \
-    -print \
     \( \
         -name "*.vhd" -o -name "*.sv"   -o -name "*.v"    \
         -o -name "*.py"  -o -name "*.sh"  -o -name "*.toml" \
@@ -143,10 +142,14 @@ echo ""
 echo "Step 2: Renaming files with NAME_ prefix..."
 RENAME_COUNT=0
 
-# Collect files first (avoid renaming while iterating)
-mapfile -d '' RENAME_CANDIDATES < <(find . \
+# Collect files first (avoid renaming while iterating). Built with a
+# read loop rather than `mapfile` for portability — macOS ships bash 3.2,
+# which lacks the `mapfile`/`readarray` builtins (added in bash 4).
+RENAME_CANDIDATES=()
+while IFS= read -r -d '' f; do
+    RENAME_CANDIDATES+=("$f")
+done < <(find . \
     "${PRUNE_EXPR[@]}" \
-    -print \
     \( \
         -name "NAME_*.vhd" -o -name "NAME_*.sv" -o -name "NAME_*.v" \
         -o -name "NAME_*.py" -o -name "NAME_*.toml" -o -name "NAME_*.ys" \

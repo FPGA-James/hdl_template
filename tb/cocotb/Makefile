@@ -14,7 +14,7 @@ COCOTB_MAKEFILES := $(shell cocotb-config --makefiles)
 
 # ── Configurable variables (passed in from top-level Makefile) ────────────────
 SIM          ?= ghdl
-TOPLEVEL     ?= NAME_core
+TOPLEVEL     ?= <<NAME>>_core
 TOPLEVEL_HDL ?= vhdl
 MODULE       ?= test_NAME
 REPO_ROOT    := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../..)
@@ -26,8 +26,8 @@ ifeq ($(TOPLEVEL_HDL),vhdl)
     endif
     TOPLEVEL_LANG   := vhdl
     VHDL_SOURCES    := \
-      $(REPO_ROOT)/src/vhdl/NAME_pkg.vhd \
-      $(REPO_ROOT)/src/vhdl/NAME_core.vhd
+      $(REPO_ROOT)/src/vhdl/<<NAME>>_pkg.vhd \
+      $(REPO_ROOT)/src/vhdl/<<NAME>>_core.vhd
     VERILOG_SOURCES :=
     COMPILE_ARGS    += --std=08
 else ifeq ($(TOPLEVEL_HDL),sv)
@@ -36,8 +36,8 @@ else ifeq ($(TOPLEVEL_HDL),sv)
     endif
     TOPLEVEL_LANG   := verilog
     VERILOG_SOURCES := \
-      $(REPO_ROOT)/src/sv/NAME_pkg.sv \
-      $(REPO_ROOT)/src/sv/NAME_core.sv
+      $(REPO_ROOT)/src/sv/<<NAME>>_pkg.sv \
+      $(REPO_ROOT)/src/sv/<<NAME>>_core.sv
     VHDL_SOURCES    :=
     VERILOG_INCLUDE_DIRS := $(REPO_ROOT)/src/sv
 else

@@ -4,7 +4,10 @@ package:
     - "FPGA-James"
 
 # ── External HDL dependencies ─────────────────────────────────────────────────
-# Run `make deps` to fetch these into deps/ via `bender vendor init`.
+# Run `make deps` (bender update) to fetch these. hdl-modules has no Bender.yml
+# of its own, but Bender still checks it out and resolves its path — see
+# `bender path hdl_modules`, used by the Makefile to locate axi_lite_pkg.vhd
+# and register_file_pkg.vhd for GHDL library compilation.
 
 dependencies:
   # hdl-modules: VHDL support library required by the hdl_registers AXI-Lite
@@ -12,13 +15,6 @@ dependencies:
   hdl_modules:
     git: "https://github.com/hdl-modules/hdl-modules.git"
     version: "6.2.1"
-
-# ── Vendor configuration ──────────────────────────────────────────────────────
-# All external repos are vendored into deps/ on `bender vendor init`.
-
-vendor_package:
-  - name: hdl_modules
-    target_dir: deps/hdl_modules
 
 # ── Source file declarations ──────────────────────────────────────────────────
 # Targets:
@@ -31,27 +27,27 @@ sources:
   # ── VHDL RTL ──────────────────────────────────────────────────────────────
   - target: rtl_vhdl
     files:
-      - src/vhdl/NAME_pkg.vhd
-      - src/vhdl/NAME_core.vhd
-      - src/vhdl/NAME_top.vhd
+      - src/vhdl/<<NAME>>_pkg.vhd
+      - src/vhdl/<<NAME>>_core.vhd
+      - src/vhdl/<<NAME>>_top.vhd
 
   # ── Generated VHDL register files (from `make regs`) ──────────────────────
   # These are listed under a separate target so they can be included
   # independently during linting and synthesis.
   - target: gen_vhdl
     files:
-      - out/regs/vhdl/NAME_regs_pkg.vhd
-      - out/regs/vhdl/NAME_register_record_pkg.vhd
-      - out/regs/vhdl/NAME_register_file_axi_lite.vhd
+      - out/regs/vhdl/<<NAME>>_regs_pkg.vhd
+      - out/regs/vhdl/<<NAME>>_register_record_pkg.vhd
+      - out/regs/vhdl/<<NAME>>_register_file_axi_lite.vhd
 
   # ── SystemVerilog RTL ──────────────────────────────────────────────────────
   - target: rtl_sv
     files:
-      - src/sv/NAME_pkg.sv
-      - src/sv/NAME_core.sv
-      - src/sv/NAME_top.sv
+      - src/sv/<<NAME>>_pkg.sv
+      - src/sv/<<NAME>>_core.sv
+      - src/sv/<<NAME>>_top.sv
 
   # ── VHDL testbench (VUnit, simulation only) ────────────────────────────────
   - target: all(simulation, tb_vhdl)
     files:
-      - tb/vunit/vhdl/NAME_tb.vhd
+      - tb/vunit/vhdl/<<NAME>>_tb.vhd

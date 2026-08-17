@@ -5,8 +5,8 @@ use ieee.numeric_std.all;
 library vunit_lib;
 context vunit_lib.vunit_context;
 
-library work;
-use work.<<NAME>>_pkg.all;
+library rtl_lib;
+use rtl_lib.<<NAME>>_pkg.all;
 
 -- VUnit testbench for <<NAME>>_core.
 --
@@ -38,12 +38,23 @@ architecture bench of <<NAME>>_tb is
     -- 10 ns clock (100 MHz)
     constant C_CLK_PERIOD : time := 10 ns;
 
+    -- Wait for the next rising edge, then a further delta past it so that
+    -- clocked outputs (registered on this same edge) have settled before
+    -- the caller reads them. Without this, a check placed immediately after
+    -- `wait until rising_edge(clk)` reads the pre-edge value, since a signal
+    -- assignment is never visible until the delta cycle after it is scheduled.
+    procedure clk_edge is
+    begin
+        wait until rising_edge(clk);
+        wait for 1 ps;
+    end procedure;
+
 begin
 
     clk <= not clk after C_CLK_PERIOD / 2;
 
     -- DUT instantiation
-    u_dut : entity work.<<NAME>>_core
+    u_dut : entity rtl_lib.<<NAME>>_core
         port map (
             clk           => clk,
             rst_n         => rst_n,
@@ -59,16 +70,16 @@ begin
         test_runner_setup(runner, runner_cfg);
 
         -- Release reset
-        wait until rising_edge(clk);
+        clk_edge;
         rst_n <= '1';
-        wait until rising_edge(clk);
+        clk_edge;
 
         -- ── test_count_up ─────────────────────────────────────────────────
         if run("test_count_up") then
             enable_i    <= '1';
             increment_i <= 1;
             for i in 1 to 8 loop
-                wait until rising_edge(clk);
+                clk_edge;
                 check_equal(unsigned(pulse_count_o), to_unsigned(i, C_COUNT_W),
                     "count_up: expected " & integer'image(i));
             end loop;
@@ -81,26 +92,27 @@ begin
             increment_i <= 255;
             -- Wind the counter close to saturation
             for i in 1 to (2**C_COUNT_W - 1) / 255 + 2 loop
-                wait until rising_edge(clk);
+                clk_edge;
             end loop;
             check_equal(unsigned(pulse_count_o), to_unsigned(2**C_COUNT_W - 1, C_COUNT_W),
                 "counter should saturate at max value");
         end if;
 
         -- ── test_reset_count ──────────────────────────────────────────────
+        -- One-cycle pulse: check the count immediately after the edge it
+        -- was sampled on, before any further counting can occur.
         if run("test_reset_count") then
             enable_i    <= '1';
             increment_i <= 1;
             for i in 1 to 5 loop
-                wait until rising_edge(clk);
+                clk_edge;
             end loop;
             check_equal(unsigned(pulse_count_o), to_unsigned(5, C_COUNT_W), "count before reset");
 
             reset_count_i <= '1';
-            wait until rising_edge(clk);
-            reset_count_i <= '0';
-            wait until rising_edge(clk);
+            clk_edge;
             check_equal(unsigned(pulse_count_o), to_unsigned(0, C_COUNT_W), "count after reset");
+            reset_count_i <= '0';
         end if;
 
         -- ── test_disable ──────────────────────────────────────────────────
@@ -108,13 +120,13 @@ begin
             enable_i    <= '1';
             increment_i <= 1;
             for i in 1 to 4 loop
-                wait until rising_edge(clk);
+                clk_edge;
             end loop;
             check_equal(unsigned(pulse_count_o), to_unsigned(4, C_COUNT_W), "count before disable");
 
             enable_i <= '0';
             for i in 1 to 4 loop
-                wait until rising_edge(clk);
+                clk_edge;
             end loop;
             check_equal(unsigned(pulse_count_o), to_unsigned(4, C_COUNT_W),
                 "count should hold when disabled");

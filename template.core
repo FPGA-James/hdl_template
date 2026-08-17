@@ -8,31 +8,31 @@ filesets:
   rtl_vhdl:
     description: "VHDL RTL sources"
     files:
-      - src/vhdl/NAME_pkg.vhd
-      - src/vhdl/NAME_core.vhd
-      - src/vhdl/NAME_top.vhd
+      - src/vhdl/<<NAME>>_pkg.vhd
+      - src/vhdl/<<NAME>>_core.vhd
+      - src/vhdl/<<NAME>>_top.vhd
     file_type: vhdlSource-2008
 
   gen_vhdl:
     description: "Generated VHDL register files (run make regs first)"
     files:
-      - out/regs/vhdl/NAME_regs_pkg.vhd
-      - out/regs/vhdl/NAME_register_record_pkg.vhd
-      - out/regs/vhdl/NAME_register_file_axi_lite.vhd
+      - out/regs/vhdl/<<NAME>>_regs_pkg.vhd
+      - out/regs/vhdl/<<NAME>>_register_record_pkg.vhd
+      - out/regs/vhdl/<<NAME>>_register_file_axi_lite.vhd
     file_type: vhdlSource-2008
 
   rtl_sv:
     description: "SystemVerilog RTL sources"
     files:
-      - src/sv/NAME_pkg.sv
-      - src/sv/NAME_core.sv
-      - src/sv/NAME_top.sv
+      - src/sv/<<NAME>>_pkg.sv
+      - src/sv/<<NAME>>_core.sv
+      - src/sv/<<NAME>>_top.sv
     file_type: systemVerilogSource
 
   tb_vhdl:
     description: "VHDL testbench (VUnit)"
     files:
-      - tb/vunit/vhdl/NAME_tb.vhd
+      - tb/vunit/vhdl/<<NAME>>_tb.vhd
     file_type: vhdlSource-2008
 
 targets:
@@ -40,7 +40,7 @@ targets:
     filesets:
       - rtl_vhdl
       - gen_vhdl
-    toplevel: NAME_top
+    toplevel: <<NAME>>_top
 
   sim:
     <<: *default
@@ -50,12 +50,12 @@ targets:
     tools:
       ghdl:
         analyze_options: [--std=08]
-        run_options: [--wave=waves/NAME_top.fst]
+        run_options: [--wave=waves/<<NAME>>_top.fst]
 
   sim_sv:
     filesets:
       - rtl_sv
-    toplevel: NAME_top
+    toplevel: <<NAME>>_top
     default_tool: icarus
 
   synth:

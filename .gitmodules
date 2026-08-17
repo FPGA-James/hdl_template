@@ -1,0 +1,3 @@
+[submodule "submodules/HDLAutoDoc"]
+	path = submodules/HDLAutoDoc
+	url = https://github.com/FPGA-James/HDLAutoDoc.git

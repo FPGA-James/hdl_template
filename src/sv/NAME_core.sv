@@ -12,10 +12,9 @@
 //
 // Instantiated by: <<NAME>>_top (sv variant)
 module <<NAME>>_core
-    import <<NAME>>_pkg::*;
 #(
     // Override the package default if needed.
-    parameter int unsigned COUNT_W = C_COUNT_W
+    parameter int unsigned COUNT_W = <<NAME>>_pkg::C_COUNT_W
 ) (
     // System clock, rising-edge triggered.
     input  logic              clk,

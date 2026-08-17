@@ -1,0 +1,18 @@
+{# page.html — HDL AutoDoc theme override for Furo #}
+{% extends "!page.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  <meta name="author" content="{{ author }}"/>
+  <meta name="description" content="{{ project }} HDL documentation"/>
+{% endblock %}
+
+{% block footer %}
+  <div class="hdl-footer">
+    Built with <a href="https://www.sphinx-doc.org" target="_blank">Sphinx</a>
+    &nbsp;&middot;&nbsp;
+    <a href="https://wavedrom.com" target="_blank">WaveDrom</a>
+    &nbsp;&middot;&nbsp;
+    <a href="https://graphviz.org" target="_blank">Graphviz</a>
+  </div>
+{% endblock %}

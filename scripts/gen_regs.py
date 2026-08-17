@@ -29,8 +29,12 @@ GEN_HTML  = REPO_ROOT / "out" / "regs" / "html"
 
 def generate_from_toml(toml_path: Path) -> None:
     """Generate all outputs for a single TOML register definition file."""
-    # Derive the register list name from the TOML stem (e.g. 'NAME_regs').
-    name = toml_path.stem
+    # Derive the register list name from the TOML stem, stripping the
+    # trailing '_regs' file-naming convention (regs/<name>_regs.toml) so the
+    # register list itself is named '<name>' — hdl_registers' own generators
+    # each append their own suffix (_regs_pkg.vhd, _regs.h, _regs.html, ...),
+    # so keeping '_regs' in the list name would double it up.
+    name = toml_path.stem.removesuffix("_regs")
     print(f"  Generating registers for: {name}")
 
     register_list = from_toml(name=name, toml_file=toml_path)

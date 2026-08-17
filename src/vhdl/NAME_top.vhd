@@ -46,7 +46,15 @@ architecture rtl of <<NAME>>_top is
     signal regs_down : <<NAME>>_regs_down_t := <<NAME>>_regs_down_init;
     signal regs_up   : <<NAME>>_regs_up_t   := <<NAME>>_regs_up_init;
 
+    -- <<NAME>>_core drives pulse_count_o as std_logic_vector; hdl_registers
+    -- represents the generated 'bit_vector' status field as unsigned. Bridge
+    -- the two via an intermediate signal rather than an inline port-map
+    -- type conversion.
+    signal pulse_count : std_logic_vector(C_COUNT_W - 1 downto 0);
+
 begin
+
+    regs_up.status.pulse_count <= unsigned(pulse_count);
 
     -- u_regs: Generated AXI4-Lite register file.
     --
@@ -77,7 +85,7 @@ begin
             reset_count_i => regs_down.command.reset_counter,
             -- To status register
             enabled_o     => regs_up.status.enabled,
-            pulse_count_o => regs_up.status.pulse_count
+            pulse_count_o => pulse_count
         );
 
 end architecture rtl;

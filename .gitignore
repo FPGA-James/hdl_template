@@ -9,10 +9,6 @@ __pycache__/
 *.pyo
 .pytest_cache/
 
-# ── HDL dependency manager outputs ────────────────────────────────────────────
-# External repos are fetched into deps/ via `bender vendor init`
-deps/
-
 # ── Build outputs ─────────────────────────────────────────────────────────────
 # All tool outputs (regs, synth, impl, sim, docs) are written under out/.
 out/*
@@ -57,4 +53,3 @@ verible.filelist
 
 # ── Keep placeholder .gitkeep files to preserve empty tracked directories ─────
 !out/.gitkeep
-!deps/.gitkeep

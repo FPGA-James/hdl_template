@@ -12,8 +12,8 @@ Click **Use this template** to create your own repository, then run `make init N
 |---|---|
 | **Dependency management** | [Bender](https://github.com/pulp-platform/bender) (primary) + [FuseSoC](https://fusesoc.readthedocs.io) (`template.core`) |
 | **Register generation** | [hdl-registers](https://hdl-registers.com) — TOML → VHDL package, AXI-Lite wrapper, C header, HTML |
-| **Simulation — VHDL** | GHDL + [VUnit](https://vunit.github.io) or [cocotb](https://www.cocotb.org) |
-| **Simulation — SV** | Verilator or Icarus Verilog + cocotb |
+| **Simulation — VHDL** | GHDL + [VUnit](https://vunit.github.io) or [cocotb](https://www.cocotb.org), or native via [NVC](https://www.nickg.me.uk/nvc/) |
+| **Simulation — SV** | Verilator or Icarus Verilog + cocotb, or native via `verilator --binary` |
 | **Synthesis** | [Yosys](https://yosyshq.net/yosys/) targeting Xilinx XC7 (`synth_xilinx -family xc7`) |
 | **Implementation** | [nextpnr](https://github.com/YosysHQ/nextpnr) place-and-route for iCE40, ECP5, MachXO2 |
 | **Linting — VHDL** | GHDL analysis + [vsg](https://vsg-hdl.readthedocs.io) (VHDL Style Guide) |
@@ -30,12 +30,14 @@ Click **Use this template** to create your own repository, then run `make init N
 
 Click **Use this template → Create a new repository** on GitHub.
 
-Clone your new repo:
+Clone your new repo, fetching the [HDLAutoDoc](https://github.com/FPGA-James/HDLAutoDoc) submodule along with it:
 
 ```bash
-git clone https://github.com/<you>/<your-repo>.git
+git clone --recurse-submodules https://github.com/<you>/<your-repo>.git
 cd <your-repo>
 ```
+
+Already cloned without `--recurse-submodules`? Run `git submodule update --init --recursive` instead. The submodule provides the documentation-generation scripts (`make html`, `make pdf`, `make test-autodoc`) — it's not needed for `make init`, `make sim`, `make synth`, or `make impl`.
 
 ### 2 — Initialise the project
 
@@ -62,7 +64,7 @@ Creates `.venv/` and installs all Python dependencies from `requirements.txt`. A
 make deps
 ```
 
-Runs `bender update && bender vendor init`, fetching external repos (including `hdl-modules` for the AXI-Lite register file) into `deps/`.
+Runs `bender update`, fetching external repos (including `hdl-modules` for the AXI-Lite register file). Dependencies are resolved via `bender path <name>` from Bender's own cache, not vendored into the tree.
 
 ### 5 — Generate register files
 
@@ -79,7 +81,11 @@ make sim                                              # VHDL + VUnit + GHDL (def
 make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl  # VHDL + cocotb + GHDL
 make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv # SV + cocotb + Verilator
 make sim FRAMEWORK=cocotb SIM=icarus TOPLEVEL_HDL=sv    # SV + cocotb + Icarus
+make sim-native TOPLEVEL_HDL=vhdl                       # VHDL, no framework — NVC directly
+make sim-native TOPLEVEL_HDL=sv                         # SV, no framework — Verilator --binary directly
 ```
+
+`sim-native` needs [NVC](https://www.nickg.me.uk/nvc/) for the VHDL path (`brew install nvc`) — it's not part of OSS CAD Suite.
 
 ---
 
@@ -104,9 +110,10 @@ Both VHDL (`src/vhdl/`) and SystemVerilog (`src/sv/`) implementations have ident
 ```
 make init NAME=<n>   Flatten src/, replace <<NAME>> placeholders, rename NAME_* files  [TOPLEVEL_HDL=vhdl|sv]
 make venv            Create .venv/ and install Python deps
-make deps            Fetch external HDL repos via Bender into deps/
+make deps            Fetch external HDL repos via Bender (bender update)
 make regs            Generate register files from regs/*.toml → out/regs/
 make sim             Run testbench (see FRAMEWORK/SIM/TOPLEVEL_HDL vars)
+make sim-native      Run the framework-less testbench directly with NVC/Verilator [TOPLEVEL_HDL=vhdl|sv]
 make lint            VHDL: GHDL analysis + vsg  |  SV: Verilator --lint-only
 make lint-vhdl       VHDL lint only
 make lint-sv         SV lint only
@@ -116,6 +123,9 @@ make impl            nextpnr place-and-route; bitstream in out/impl/
 make impl-gui        Open nextpnr interactive placement/routing GUI
 make icestudio       Run full impl then open IceStudio for device programming
 make html            Build Sphinx documentation
+make pdf             Build PDF documentation via LaTeX
+make coverage        Generate documentation coverage report (docs/coverage.rst)
+make reports         Ingest synthesis/PnR reports from out/reports/ into the docs (run after make synth/impl)
 make test-autodoc    Run the HDLAutoDoc pytest suite
 make vars            Print all current Makefile variable values
 make clean           Remove out/ build artefacts
@@ -141,6 +151,21 @@ make verible-ls      Generate verible.filelist for Verible
 
 ---
 
+## Testing the template
+
+`scripts/smoke_test.sh` is the local counterpart to the `smoke-test` CI job: it copies the working tree into an isolated temp directory per language, runs `make init`, then walks the initialised project through `regs`, `lsp`, every applicable testbench flow (native, cocotb, VUnit for VHDL), `lint`, `synth`, `html`, and `coverage`. Every step runs regardless of earlier failures, so one invocation prints a full pass/fail summary rather than stopping at the first broken target — the exit code is non-zero if anything failed.
+
+```bash
+scripts/smoke_test.sh              # both VHDL and SV
+scripts/smoke_test.sh vhdl         # VHDL project only
+scripts/smoke_test.sh sv           # SystemVerilog project only
+KEEP=1 scripts/smoke_test.sh       # keep the temp project dirs + logs for inspection
+```
+
+Needs the full toolchain on `PATH` (OSS CAD Suite, Bender, NVC) and network access (`make deps` fetches `hdl-modules`).
+
+---
+
 ## Project layout
 
 ```
@@ -158,11 +183,14 @@ hdl_template/
 │
 ├── tb/
 │   ├── vunit/
-│   │   ├── run.py          VUnit runner
+│   │   ├── run.py          VUnit runner (VHDL only, for now)
 │   │   └── vhdl/NAME_tb.vhd
-│   └── cocotb/
-│       ├── Makefile        cocotb sim Makefile
-│       └── test_NAME.py    cocotb tests (language-agnostic)
+│   ├── cocotb/
+│   │   ├── Makefile        cocotb sim Makefile
+│   │   └── test_NAME.py    cocotb tests (language-agnostic)
+│   └── native/             Framework-less testbenches — run directly by NVC (VHDL) / Verilator --binary (SV)
+│       ├── vhdl/NAME_tb.vhd
+│       └── sv/NAME_tb.sv
 │
 ├── regs/
 │   └── NAME_regs.toml      Register definitions (hdl-registers TOML format)
@@ -177,18 +205,20 @@ hdl_template/
 │   ├── reports/synth/      Utilisation, check, JSON, synthesis log
 │   ├── reports/impl/       Timing, routed JSON, SDF, SVG floorplans, PnR log
 │   ├── docs/               Sphinx HTML/PDF output
-│   └── vunit/ cocotb/ waves/  Simulation artefacts
+│   └── vunit/ cocotb/ native/ waves/  Simulation artefacts
 │
 ├── scripts/
-│   ├── hdl_autodoc/        HDLAutoDoc extraction pipeline (do not modify)
 │   ├── gen_regs.py         hdl-registers generation driver
 │   ├── gen_filelist.sh     Bender → filelist.f
 │   ├── gen_vhdl_ls.py      Bender → vhdl_ls.toml (VHDL LS config)
 │   ├── gen_verible_filelist.py  Bender → verible.filelist (Verible config)
-│   └── init_project.sh     <<NAME>> placeholder replacement + src/ flattening
+│   ├── init_project.sh     <<NAME>> placeholder replacement + src/ flattening
+│   └── smoke_test.sh       make init + full pipeline smoke test, both languages (see Testing below)
 │
-├── docs/                   Sphinx documentation source
-└── deps/                   GENERATED — external repos fetched by Bender (gitignored)
+├── submodules/
+│   └── HDLAutoDoc/         Git submodule — HDL AutoDoc extraction/generation scripts (source of truth; not vendored)
+│
+└── docs/                   Sphinx documentation source (conf.py, _static/, _templates/ are project-owned, not from the submodule)
 ```
 
 ---
@@ -197,7 +227,7 @@ hdl_template/
 
 All example files use `<<NAME>>` in file contents and `NAME_` as a filename prefix. `make init NAME=<project>` replaces all occurrences and renames files in one step.
 
-Files excluded from replacement: `.venv/`, `deps/`, `.git/`, `out/`.
+Files excluded from replacement: `.venv/`, `deps/`, `.git/`, `out/`, `submodules/`.
 
 ---
 
@@ -215,6 +245,7 @@ GitHub Actions runs on every push and pull request:
 | `sim-sv-icarus` | Icarus Verilog + cocotb |
 | `synth` | Yosys XC7 |
 | `test-autodoc` | pytest (HDLAutoDoc test suite) |
+| `smoke-test` (vhdl, sv matrix) | `scripts/smoke_test.sh` — the only job that runs `make init` first, then `regs`/`lsp`/every testbench flow/`lint`/`synth`/`html`/`coverage` against the initialised project |
 
 The `docs.yml` workflow builds Sphinx HTML and deploys to GitHub Pages on every push to `main`. Enable it under **Settings → Pages → Source: GitHub Actions**.
 
@@ -229,6 +260,7 @@ The `docs.yml` workflow builds Sphinx HTML and deploys to GitHub Pages on every 
 | Verilator | SV sim + lint | `apt install verilator` / `brew install verilator` |
 | Icarus Verilog | SV sim (icarus path) | `apt install iverilog` / `brew install icarus-verilog` |
 | Yosys | Synthesis | `apt install yosys` / [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build/releases) |
+| [NVC](https://www.nickg.me.uk/nvc/) | `make sim-native TOPLEVEL_HDL=vhdl` | `brew install nvc` / [releases](https://github.com/nickg/nvc/releases) — not part of OSS CAD Suite |
 | Graphviz | Documentation diagrams | `apt install graphviz` / `brew install graphviz` |
 | Bender | Dependency management | [releases](https://github.com/pulp-platform/bender/releases) |
 | VHDL LS (`hbohlin.vhdl-ls`) | VHDL editor intelligence | VS Code extension |
