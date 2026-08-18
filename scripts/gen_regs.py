@@ -309,21 +309,42 @@ GEN_HTML  = REPO_ROOT / "out" / "regs" / "html"
 
 
 def detect_language(repo_root: Path) -> str:
-    """Return "vhdl" or "sv" based on which core source file exists under src/.
-    Mirrors how the rest of the Makefile infers language post-`make init`."""
+    """Return "vhdl" or "sv" based on which core source file exists.
+    Checks the flat post-`make init` layout (src/*_core.<ext>) first, then
+    falls back to the pre-init per-language layout (src/vhdl/, src/sv/),
+    preferring vhdl when both exist there -- matching this generator's
+    historical VHDL-default behavior from before language auto-detection
+    existed (it always ran the VHDL generators unconditionally)."""
     src_dir = repo_root / "src"
     if list(src_dir.glob("*_core.vhd")):
         return "vhdl"
     if list(src_dir.glob("*_core.sv")):
+        return "sv"
+    if list((src_dir / "vhdl").glob("*_core.vhd")):
+        return "vhdl"
+    if list((src_dir / "sv").glob("*_core.sv")):
         return "sv"
     raise ValueError(
         f"No *_core.vhd or *_core.sv found under {src_dir} -- run `make init` first."
     )
 
 
+def _core_src_dir(repo_root: Path, language: str) -> Path:
+    """Return the directory containing <name>_core/<name>_top for the given
+    language -- flat src/ post-`make init`, or src/vhdl//src/sv/ pre-init."""
+    src_dir = repo_root / "src"
+    ext = "vhd" if language == "vhdl" else "sv"
+    if list(src_dir.glob(f"*_core.{ext}")):
+        return src_dir
+    nested = src_dir / language
+    if list(nested.glob(f"*_core.{ext}")):
+        return nested
+    raise ValueError(f"No *_core.{ext} found under {src_dir} or {nested}")
+
+
 def autowire_top(name: str, language: str, register_list, repo_root: Path) -> None:
     """Regenerate the marker-delimited register-wiring region(s) in <name>_top."""
-    src_dir = repo_root / "src"
+    src_dir = _core_src_dir(repo_root, language)
     ext = "vhd" if language == "vhdl" else "sv"
     core_file = src_dir / f"{name}_core.{ext}"
     top_file = src_dir / f"{name}_top.{ext}"
