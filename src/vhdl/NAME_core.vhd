@@ -30,7 +30,8 @@ entity <<NAME>>_core is
         enable_i      : in  std_logic;
         -- Step size added to the count on each qualifying pulse.
         increment_i   : in  integer range 1 to 255;
-        -- One-cycle reset pulse. Clears count_r to zero on the next clock.
+        -- Held-level reset request. Core detects the rising edge internally and
+        -- clears count_r for exactly one cycle.
         reset_count_i : in  std_logic;
 
         -- ── To register block ────────────────────────────────────────────────
@@ -47,11 +48,16 @@ architecture rtl of <<NAME>>_core is
     -- Registered pulse counter. Saturates rather than wrapping.
     signal count_r : unsigned(C_COUNT_W-1 downto 0) := (others => '0');
 
+    -- Registered previous value of reset_count_i, used to derive a
+    -- one-cycle internal pulse from what is now a held-level input (the
+    -- register file no longer auto-clears it after one cycle).
+    signal reset_count_prev : std_logic := '0';
+
 begin
 
     -- p_count: Clocked pulse counter with saturating addition.
     --
-    -- Priority:  reset > reset_count_i > counting
+    -- Priority:  reset > reset_count pulse > counting
     -- Saturation prevents wrap-around at full-scale.
     --
     -- .. wavedrom::
@@ -66,13 +72,20 @@ begin
     --      { "name": "enabled_o",    "wave": "0..1......" }
     --    ]}
     p_count : process(clk) is
-        variable next_count : unsigned(C_COUNT_W downto 0);
+        variable next_count        : unsigned(C_COUNT_W downto 0);
+        variable reset_count_pulse : std_logic;
     begin
         if rising_edge(clk) then
+            -- reset_count_prev still holds last cycle's value here (signal
+            -- updates via <= are not visible until the next delta), so this
+            -- detects a genuine 0->1 transition on reset_count_i.
+            reset_count_pulse := reset_count_i and not reset_count_prev;
+            reset_count_prev  <= reset_count_i;
+
             if rst_n = '0' then
                 count_r   <= (others => '0');
                 enabled_o <= '0';
-            elsif reset_count_i = '1' then
+            elsif reset_count_pulse = '1' then
                 count_r   <= (others => '0');
                 enabled_o <= enable_i;
             elsif enable_i = '1' then

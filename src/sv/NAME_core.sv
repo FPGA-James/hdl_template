@@ -26,7 +26,8 @@ module <<NAME>>_core
     input  logic              enable_i,
     // Step size added to count on each qualifying pulse.
     input  int unsigned       increment_i,
-    // One-cycle reset pulse. Clears count on the next rising edge.
+    // Held-level reset request. Core detects the rising edge internally and
+    // clears the count for exactly one cycle.
     input  logic              reset_count_i,
 
     // ── To register block ───────────────────────────────────────────────────
@@ -39,23 +40,35 @@ module <<NAME>>_core
     logic [COUNT_W:0] count_ext;  // one extra bit for saturation detection
     logic [COUNT_W-1:0] count_r;
 
+    // Registered previous value of reset_count_i, used to derive a
+    // one-cycle internal pulse from what is now a held-level input (the
+    // register file no longer auto-clears it after one cycle).
+    logic reset_count_prev;
+    logic reset_count_pulse;
+
+    assign reset_count_pulse = reset_count_i & ~reset_count_prev;
+
     // p_count: Clocked pulse counter with saturating addition.
     //
-    // Priority: reset > reset_count_i > counting
+    // Priority: reset > reset_count pulse > counting
     always_ff @(posedge clk) begin
         if (!rst_n) begin
-            count_r   <= '0;
-            enabled_o <= 1'b0;
-        end else if (reset_count_i) begin
-            count_r   <= '0;
-            enabled_o <= enable_i;
-        end else if (enable_i) begin
-            // Promote to COUNT_W+1 bits for saturation check.
-            count_ext = {1'b0, count_r} + COUNT_W'(increment_i);
-            count_r   <= count_ext[COUNT_W] ? '1 : count_ext[COUNT_W-1:0];
-            enabled_o <= 1'b1;
+            count_r          <= '0;
+            enabled_o        <= 1'b0;
+            reset_count_prev <= 1'b0;
         end else begin
-            enabled_o <= 1'b0;
+            reset_count_prev <= reset_count_i;
+            if (reset_count_pulse) begin
+                count_r   <= '0;
+                enabled_o <= enable_i;
+            end else if (enable_i) begin
+                // Promote to COUNT_W+1 bits for saturation check.
+                count_ext = {1'b0, count_r} + COUNT_W'(increment_i);
+                count_r   <= count_ext[COUNT_W] ? '1 : count_ext[COUNT_W-1:0];
+                enabled_o <= 1'b1;
+            end else begin
+                enabled_o <= 1'b0;
+            end
         end
     end
 
