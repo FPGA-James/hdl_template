@@ -134,3 +134,100 @@ def test_build_passthrough_mappings_raises_on_unmatched_port(demo_register_list,
     }
     with pytest.raises(ValueError, match="extra_i"):
         gen_regs.build_passthrough_mappings(core_ports, mappings, top_ports)
+
+
+def test_rewrite_marker_region_replaces_only_between_markers(tmp_path):
+    original = (
+        "line before\n"
+        "-- BEGIN X\n"
+        "old content\n"
+        "-- END X\n"
+        "line after\n"
+    )
+    path = tmp_path / "f.vhd"
+    path.write_text(original)
+
+    gen_regs.rewrite_marker_region(path, "-- BEGIN X", "-- END X", "new content")
+
+    result = path.read_text()
+    assert "line before" in result
+    assert "line after" in result
+    assert "old content" not in result
+    assert "new content" in result
+
+
+def test_rewrite_marker_region_raises_if_markers_missing(tmp_path):
+    path = tmp_path / "f.vhd"
+    path.write_text("no markers here\n")
+    with pytest.raises(ValueError, match="Could not find marker"):
+        gen_regs.rewrite_marker_region(path, "-- BEGIN X", "-- END X", "content")
+
+
+def test_rewrite_marker_region_is_idempotent(tmp_path):
+    path = tmp_path / "f.vhd"
+    path.write_text("-- BEGIN X\nold\n-- END X\n")
+    gen_regs.rewrite_marker_region(path, "-- BEGIN X", "-- END X", "same content")
+    first = path.read_text()
+    gen_regs.rewrite_marker_region(path, "-- BEGIN X", "-- END X", "same content")
+    second = path.read_text()
+    assert first == second
+
+
+def test_render_vhdl_signals_block_only_includes_cast_fields(demo_register_list):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    block = gen_regs.render_vhdl_signals_block(mappings)
+    assert "pulse_count" in block
+    assert "std_logic_vector(16 - 1 downto 0)" in block
+    assert "enable" not in block  # Bit fields never need a bridging signal
+
+
+def test_render_vhdl_wiring_block_contains_expected_connections(demo_register_list):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    passthrough = {"clk": "clk", "rst_n": "rst_n"}
+    block = gen_regs.render_vhdl_wiring_block("demo", mappings, passthrough)
+    assert "u_core : entity work.demo_core" in block
+    assert "clk => clk" in block
+    assert "rst_n => rst_n" in block
+    assert "enable_i" in block and "regs_down.conf.enable" in block
+    assert "reset_count_i" in block and "regs_down.command.reset_count" in block
+    assert "enabled_o" in block and "regs_up.status.enabled" in block
+    # BitVector "up" field connects to the bridging signal, not the record directly.
+    assert "pulse_count_o" in block and "=> pulse_count" in block
+    assert "regs_up.status.pulse_count <= unsigned(pulse_count)" in block
+
+
+def test_render_vhdl_wiring_block_casts_down_bitvector_inline(tmp_path):
+    # This project's current register map has no 'down' BitVector field, but
+    # the renderer must still handle one correctly: input-port associations
+    # accept an arbitrary expression in VHDL, so this needs an inline
+    # std_logic_vector(...) cast, not a bridging signal (verified empirically
+    # with GHDL -- see the note above render_vhdl_wiring_block).
+    from hdl_registers.parser.toml import from_toml
+
+    toml_file = tmp_path / "demo_regs.toml"
+    toml_file.write_text(
+        '[conf]\nmode = "w"\n[conf.mask]\ntype = "bit_vector"\nwidth = 8\n'
+        'default_value = "00000000"\n'
+    )
+    register_list = from_toml(name="demo", toml_file=toml_file)
+    mappings = gen_regs.build_field_mappings(register_list)
+
+    block = gen_regs.render_vhdl_wiring_block("demo", mappings, {})
+
+    assert "mask_i => std_logic_vector(regs_down.conf.mask)" in block
+    # No bridging signal for the 'down' direction.
+    assert "regs_down.conf.mask <=" not in block
+
+
+def test_render_sv_wiring_block_contains_expected_connections(demo_register_list):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    passthrough = {"clk": "clk", "rst_n": "rst_n"}
+    block = gen_regs.render_sv_wiring_block("demo", mappings, passthrough)
+    assert "demo_core u_core (" in block
+    assert ".clk(clk)" in block
+    assert ".rst_n(rst_n)" in block
+    assert ".enable_i(hwif_out.conf.enable.value)" in block
+    assert ".reset_count_i(hwif_out.command.reset_count.value)" in block
+    assert ".enabled_o(hwif_in.status.enabled.next)" in block
+    # SV struct fields are directly compatible -- no bridging signal needed.
+    assert ".pulse_count_o(hwif_in.status.pulse_count.next)" in block

@@ -199,6 +199,92 @@ def build_passthrough_mappings(
         )
     return passthrough
 
+def rewrite_marker_region(
+    file_path: Path, begin_marker: str, end_marker: str, new_content: str
+) -> None:
+    """Replace the text strictly between a BEGIN/END marker comment pair.
+    The markers themselves are preserved and left in place."""
+    text = file_path.read_text()
+    pattern = re.compile(re.escape(begin_marker) + r".*?" + re.escape(end_marker), re.DOTALL)
+    if not pattern.search(text):
+        raise ValueError(
+            f"Could not find marker region '{begin_marker}' ... "
+            f"'{end_marker}' in {file_path}. Add the marker comment pair "
+            "before running `make regs`."
+        )
+    replacement = f"{begin_marker}\n{new_content}\n    {end_marker}"
+    new_text = pattern.sub(lambda _match: replacement, text, count=1)
+    file_path.write_text(new_text)
+
+
+def render_vhdl_signals_block(field_mappings: list[FieldMapping]) -> str:
+    """Bridging signal declarations for 'up' BitVector fields."""
+    lines = [
+        f"    signal {m.field_name} : std_logic_vector({m.width} - 1 downto 0);"
+        for m in field_mappings
+        if m.direction == "up" and m.needs_cast
+    ]
+    return "\n".join(lines)
+
+
+def render_vhdl_wiring_block(
+    name: str, field_mappings: list[FieldMapping], passthrough: dict[str, str]
+) -> str:
+    # 'up' (output-port) BitVector fields need an intermediate signal --
+    # GHDL rejects both std_logic_vector(...) and unsigned(...) as inline
+    # output-port conversions (verified empirically). 'down' (input-port)
+    # BitVector fields don't have this restriction: VHDL allows an
+    # arbitrary expression as an input-port actual, so std_logic_vector(...)
+    # works inline there (also verified empirically) -- no bridging signal
+    # needed for that direction.
+    bridge_assignments = [
+        f"    regs_up.{m.register_name}.{m.field_name} <= unsigned({m.field_name});"
+        for m in field_mappings
+        if m.direction == "up" and m.needs_cast
+    ]
+
+    port_lines = [f"            {formal} => {actual}" for formal, actual in passthrough.items()]
+    for m in field_mappings:
+        record = "regs_down" if m.direction == "down" else "regs_up"
+        field_ref = f"{record}.{m.register_name}.{m.field_name}"
+        if m.direction == "up" and m.needs_cast:
+            actual = m.field_name  # connects to the bridging signal instead
+        elif m.direction == "down" and m.needs_cast:
+            actual = f"std_logic_vector({field_ref})"  # inline cast, input port
+        else:
+            actual = field_ref
+        port_lines.append(f"            {m.port_name} => {actual}")
+
+    instance = [
+        f"    u_core : entity work.{name}_core",
+        "        port map (",
+        ",\n".join(port_lines),
+        "        );",
+    ]
+
+    return "\n".join(bridge_assignments + ([""] if bridge_assignments else []) + instance)
+
+
+def render_sv_wiring_block(
+    name: str, field_mappings: list[FieldMapping], passthrough: dict[str, str]
+) -> str:
+    port_lines = [f"        .{formal}({actual})" for formal, actual in passthrough.items()]
+    for m in field_mappings:
+        if m.direction == "down":
+            actual = f"hwif_out.{m.register_name}.{m.field_name}.value"
+        else:
+            actual = f"hwif_in.{m.register_name}.{m.field_name}.next"
+        port_lines.append(f"        .{m.port_name}({actual})")
+
+    return "\n".join(
+        [
+            f"    {name}_core u_core (",
+            ",\n".join(port_lines),
+            "    );",
+        ]
+    )
+
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REGS_DIR  = REPO_ROOT / "regs"
 GEN_VHDL  = REPO_ROOT / "out" / "regs" / "vhdl"
