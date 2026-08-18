@@ -7,6 +7,8 @@ cocotb>=2.0
 
 # ── Register generation ───────────────────────────────────────────────────────
 hdl-registers>=8.0
+# SystemVerilog register-file generation (hdl_registers' SV generator delegates to this)
+peakrdl-regblock>=1.0
 
 # ── VHDL linting ─────────────────────────────────────────────────────────────
 # vsg (VHDL Style Guide): style/convention linter configured via vsg.yml

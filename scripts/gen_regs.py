@@ -21,6 +21,9 @@ from hdl_registers.parser.toml import from_toml
 from hdl_registers.generator.vhdl.register_package import VhdlRegisterPackageGenerator
 from hdl_registers.generator.vhdl.record_package import VhdlRecordPackageGenerator
 from hdl_registers.generator.vhdl.axi_lite.wrapper import VhdlAxiLiteWrapperGenerator
+from hdl_registers.generator.systemverilog.axi_lite.register_file import (
+    SystemVerilogAxiLiteGenerator,
+)
 from hdl_registers.generator.c.header import CHeaderGenerator
 from hdl_registers.generator.html.page import HtmlPageGenerator
 from hdl_registers.field.bit_vector import BitVector
@@ -282,6 +285,18 @@ def render_sv_wiring_block(
             ",\n".join(port_lines),
             "    );",
         ]
+    )
+
+
+def generate_sv(register_list, output_folder: Path) -> None:
+    """Generate the SystemVerilog AXI-Lite register file and its types package.
+    Uses flatten_axi_lite=True so the bus side is discrete signals (s_axil_*),
+    not a bundled SV interface -- keeps the bus-side wiring convention close
+    to this project's existing hand-written SV top and avoids depending on
+    an external interface definition.
+    """
+    SystemVerilogAxiLiteGenerator(register_list=register_list, output_folder=output_folder).create(
+        flatten_axi_lite=True
     )
 
 
