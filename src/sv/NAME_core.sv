@@ -52,23 +52,21 @@ module <<NAME>>_core
     //
     // Priority: reset > reset_count pulse > counting
     always_ff @(posedge clk) begin
+        reset_count_prev <= reset_count_i;
+
         if (!rst_n) begin
-            count_r          <= '0;
-            enabled_o        <= 1'b0;
-            reset_count_prev <= 1'b0;
+            count_r   <= '0;
+            enabled_o <= 1'b0;
+        end else if (reset_count_pulse) begin
+            count_r   <= '0;
+            enabled_o <= enable_i;
+        end else if (enable_i) begin
+            // Promote to COUNT_W+1 bits for saturation check.
+            count_ext = {1'b0, count_r} + COUNT_W'(increment_i);
+            count_r   <= count_ext[COUNT_W] ? '1 : count_ext[COUNT_W-1:0];
+            enabled_o <= 1'b1;
         end else begin
-            reset_count_prev <= reset_count_i;
-            if (reset_count_pulse) begin
-                count_r   <= '0;
-                enabled_o <= enable_i;
-            end else if (enable_i) begin
-                // Promote to COUNT_W+1 bits for saturation check.
-                count_ext = {1'b0, count_r} + COUNT_W'(increment_i);
-                count_r   <= count_ext[COUNT_W] ? '1 : count_ext[COUNT_W-1:0];
-                enabled_o <= 1'b1;
-            end else begin
-                enabled_o <= 1'b0;
-            end
+            enabled_o <= 1'b0;
         end
     end
 
