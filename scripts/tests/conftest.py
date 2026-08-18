@@ -54,3 +54,43 @@ endmodule : demo_core
     path = tmp_path / "demo_core.sv"
     path.write_text(content)
     return path
+
+
+@pytest.fixture
+def demo_toml_file(tmp_path: Path) -> Path:
+    content = """\
+[conf]
+mode = "r_w"
+[conf.enable]
+type = "bit"
+default_value = "0"
+[conf.increment]
+type = "integer"
+min_value = 1
+max_value = 255
+default_value = 1
+
+[command]
+mode = "w"
+[command.reset_count]
+type = "bit"
+default_value = "0"
+
+[status]
+mode = "r"
+[status.enabled]
+type = "bit"
+[status.pulse_count]
+type = "bit_vector"
+width = 16
+"""
+    path = tmp_path / "demo_regs.toml"
+    path.write_text(content)
+    return path
+
+
+@pytest.fixture
+def demo_register_list(demo_toml_file):
+    from hdl_registers.parser.toml import from_toml
+
+    return from_toml(name="demo", toml_file=demo_toml_file)

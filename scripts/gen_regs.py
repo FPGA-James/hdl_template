@@ -23,6 +23,7 @@ from hdl_registers.generator.vhdl.record_package import VhdlRecordPackageGenerat
 from hdl_registers.generator.vhdl.axi_lite.wrapper import VhdlAxiLiteWrapperGenerator
 from hdl_registers.generator.c.header import CHeaderGenerator
 from hdl_registers.generator.html.page import HtmlPageGenerator
+from hdl_registers.field.bit_vector import BitVector
 
 
 @dataclass
@@ -94,6 +95,109 @@ def parse_sv_ports(core_file: Path) -> dict[str, Port]:
         direction, type_str, name = port_match.groups()
         ports[name] = Port(name=name, direction=direction, type_str=type_str.strip())
     return ports
+
+
+@dataclass
+class FieldMapping:
+    """A single register field, resolved to the core port it drives/receives."""
+
+    register_name: str
+    field_name: str
+    field_type: type
+    width: int
+    direction: str  # "down" (host writes, core input) or "up" (host reads, core output)
+    port_name: str
+    needs_cast: bool  # VHDL only: True for BitVector fields (record type is `unsigned`)
+
+
+def build_field_mappings(register_list) -> list[FieldMapping]:
+    """Walk the register list and compute each field's expected core port name,
+    direction, and whether a VHDL type cast is needed to reach that port."""
+    mappings: list[FieldMapping] = []
+    for register in register_list.register_objects:
+        mode = register.mode.shorthand
+        if mode in ("w", "r_w"):
+            direction, suffix = "down", "_i"
+        elif mode == "r":
+            direction, suffix = "up", "_o"
+        else:
+            raise ValueError(
+                f"Register '{register.name}' uses mode '{mode}', which the "
+                "SystemVerilog register-file generator does not support "
+                "(only r, w, r_w). Use a supported mode — see Task 1 of "
+                "docs/superpowers/plans/2026-08-17-register-autowiring.md "
+                "for the pattern used to replicate wpulse-style behavior "
+                "with a plain 'w' field plus a core-side edge detector."
+            )
+        for field in register.fields:
+            mappings.append(
+                FieldMapping(
+                    register_name=register.name,
+                    field_name=field.name,
+                    field_type=type(field),
+                    width=field.width,
+                    direction=direction,
+                    port_name=f"{field.name}{suffix}",
+                    needs_cast=isinstance(field, BitVector),
+                )
+            )
+    return mappings
+
+
+def resolve_port_mappings(mappings: list[FieldMapping], core_ports: dict[str, Port]) -> None:
+    """Verify every field maps to an existing core port with the matching direction.
+    Raises ValueError listing every problem found, not just the first."""
+    errors = []
+    for mapping in mappings:
+        port = core_ports.get(mapping.port_name)
+        if port is None:
+            errors.append(
+                f"register field '{mapping.register_name}.{mapping.field_name}' "
+                f"expects a core port named '{mapping.port_name}', but no such "
+                "port exists"
+            )
+            continue
+        expected_direction = "in" if mapping.direction == "down" else "out"
+        actual_direction = "in" if port.direction in ("in", "input") else "out"
+        if actual_direction != expected_direction:
+            errors.append(
+                f"core port '{mapping.port_name}' has direction "
+                f"'{port.direction}', but register field "
+                f"'{mapping.register_name}.{mapping.field_name}' needs "
+                f"direction '{expected_direction}'"
+            )
+    if errors:
+        raise ValueError(
+            "Register field <-> core port mismatch:\n"
+            + "\n".join(f"  - {e}" for e in errors)
+        )
+
+
+def build_passthrough_mappings(
+    core_ports: dict[str, Port],
+    field_mappings: list[FieldMapping],
+    top_ports: dict[str, Port],
+) -> dict[str, str]:
+    """For core ports not covered by any register field (e.g. clk, rst_n),
+    connect them to an identically-named port on <<NAME>>_top."""
+    covered = {m.port_name for m in field_mappings}
+    passthrough: dict[str, str] = {}
+    errors = []
+    for name in core_ports:
+        if name in covered:
+            continue
+        if name not in top_ports:
+            errors.append(
+                f"core port '{name}' is not a register-derived port and has "
+                "no matching port on <<NAME>>_top to pass through"
+            )
+            continue
+        passthrough[name] = name
+    if errors:
+        raise ValueError(
+            "Unmapped core port(s):\n" + "\n".join(f"  - {e}" for e in errors)
+        )
+    return passthrough
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REGS_DIR  = REPO_ROOT / "regs"

@@ -54,3 +54,83 @@ def test_parse_sv_ports_missing_module_raises(tmp_path):
     bad_file.write_text("// no module here\n")
     with pytest.raises(ValueError, match="No module port clause"):
         gen_regs.parse_sv_ports(bad_file)
+
+
+def test_build_field_mappings_derives_port_names_and_directions(demo_register_list):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    by_field = {(m.register_name, m.field_name): m for m in mappings}
+
+    enable = by_field[("conf", "enable")]
+    assert enable.direction == "down"
+    assert enable.port_name == "enable_i"
+    assert enable.needs_cast is False
+
+    reset_count = by_field[("command", "reset_count")]
+    assert reset_count.direction == "down"
+    assert reset_count.port_name == "reset_count_i"
+
+    pulse_count = by_field[("status", "pulse_count")]
+    assert pulse_count.direction == "up"
+    assert pulse_count.port_name == "pulse_count_o"
+    assert pulse_count.needs_cast is True
+    assert pulse_count.width == 16
+
+    increment = by_field[("conf", "increment")]
+    assert increment.needs_cast is False
+
+
+def test_build_field_mappings_rejects_unsupported_mode(tmp_path):
+    from hdl_registers.parser.toml import from_toml
+
+    toml_file = tmp_path / "bad_regs.toml"
+    toml_file.write_text(
+        '[command]\nmode = "wpulse"\n[command.reset_count]\ntype = "bit"\n'
+        'default_value = "0"\n'
+    )
+    register_list = from_toml(name="demo", toml_file=toml_file)
+    with pytest.raises(ValueError, match="wpulse"):
+        gen_regs.build_field_mappings(register_list)
+
+
+def test_resolve_port_mappings_passes_when_all_fields_match(demo_register_list, vhdl_core_file):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    core_ports = gen_regs.parse_vhdl_ports(vhdl_core_file)
+    gen_regs.resolve_port_mappings(mappings, core_ports)  # must not raise
+
+
+def test_resolve_port_mappings_raises_on_missing_port(demo_register_list):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    core_ports = {}  # no ports at all
+    with pytest.raises(ValueError, match="enable_i"):
+        gen_regs.resolve_port_mappings(mappings, core_ports)
+
+
+def test_resolve_port_mappings_raises_on_direction_mismatch(demo_register_list, vhdl_core_file):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    core_ports = gen_regs.parse_vhdl_ports(vhdl_core_file)
+    core_ports["enable_i"].direction = "out"  # flip it
+    with pytest.raises(ValueError, match="enable_i"):
+        gen_regs.resolve_port_mappings(mappings, core_ports)
+
+
+def test_build_passthrough_mappings_matches_clk_and_rst_n(demo_register_list, vhdl_core_file):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    core_ports = gen_regs.parse_vhdl_ports(vhdl_core_file)
+    top_ports = {
+        "clk": gen_regs.Port("clk", "in", "std_logic"),
+        "rst_n": gen_regs.Port("rst_n", "in", "std_logic"),
+    }
+    passthrough = gen_regs.build_passthrough_mappings(core_ports, mappings, top_ports)
+    assert passthrough == {"clk": "clk", "rst_n": "rst_n"}
+
+
+def test_build_passthrough_mappings_raises_on_unmatched_port(demo_register_list, vhdl_core_file):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    core_ports = gen_regs.parse_vhdl_ports(vhdl_core_file)
+    core_ports["extra_i"] = gen_regs.Port("extra_i", "in", "std_logic")
+    top_ports = {
+        "clk": gen_regs.Port("clk", "in", "std_logic"),
+        "rst_n": gen_regs.Port("rst_n", "in", "std_logic"),
+    }
+    with pytest.raises(ValueError, match="extra_i"):
+        gen_regs.build_passthrough_mappings(core_ports, mappings, top_ports)
