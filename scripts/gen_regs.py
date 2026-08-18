@@ -303,8 +303,60 @@ def generate_sv(register_list, output_folder: Path) -> None:
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REGS_DIR  = REPO_ROOT / "regs"
 GEN_VHDL  = REPO_ROOT / "out" / "regs" / "vhdl"
+GEN_SV    = REPO_ROOT / "out" / "regs" / "sv"
 GEN_C     = REPO_ROOT / "out" / "regs" / "c"
 GEN_HTML  = REPO_ROOT / "out" / "regs" / "html"
+
+
+def detect_language(repo_root: Path) -> str:
+    """Return "vhdl" or "sv" based on which core source file exists under src/.
+    Mirrors how the rest of the Makefile infers language post-`make init`."""
+    src_dir = repo_root / "src"
+    if list(src_dir.glob("*_core.vhd")):
+        return "vhdl"
+    if list(src_dir.glob("*_core.sv")):
+        return "sv"
+    raise ValueError(
+        f"No *_core.vhd or *_core.sv found under {src_dir} -- run `make init` first."
+    )
+
+
+def autowire_top(name: str, language: str, register_list, repo_root: Path) -> None:
+    """Regenerate the marker-delimited register-wiring region(s) in <name>_top."""
+    src_dir = repo_root / "src"
+    ext = "vhd" if language == "vhdl" else "sv"
+    core_file = src_dir / f"{name}_core.{ext}"
+    top_file = src_dir / f"{name}_top.{ext}"
+
+    parse_ports = parse_vhdl_ports if language == "vhdl" else parse_sv_ports
+    core_ports = parse_ports(core_file)
+    top_ports = parse_ports(top_file)
+
+    field_mappings = build_field_mappings(register_list)
+    resolve_port_mappings(field_mappings, core_ports)
+    passthrough = build_passthrough_mappings(core_ports, field_mappings, top_ports)
+
+    if language == "vhdl":
+        rewrite_marker_region(
+            top_file,
+            "-- BEGIN AUTOGEN REGISTER SIGNALS",
+            "-- END AUTOGEN REGISTER SIGNALS",
+            render_vhdl_signals_block(field_mappings),
+        )
+        rewrite_marker_region(
+            top_file,
+            "-- BEGIN AUTOGEN REGISTERS",
+            "-- END AUTOGEN REGISTERS",
+            render_vhdl_wiring_block(name, field_mappings, passthrough),
+        )
+    else:
+        rewrite_marker_region(
+            top_file,
+            "// BEGIN AUTOGEN REGISTERS",
+            "// END AUTOGEN REGISTERS",
+            render_sv_wiring_block(name, field_mappings, passthrough),
+        )
+    print(f"  Auto-wired {top_file.relative_to(repo_root)}")
 
 
 def generate_from_toml(toml_path: Path) -> None:
@@ -319,35 +371,22 @@ def generate_from_toml(toml_path: Path) -> None:
 
     register_list = from_toml(name=name, toml_file=toml_path)
 
-    # VHDL: register address/field constants package (<name>_regs_pkg.vhd)
-    VhdlRegisterPackageGenerator(
-        register_list=register_list, output_folder=GEN_VHDL
-    ).create()
+    language = detect_language(REPO_ROOT)
+    if language == "vhdl":
+        VhdlRegisterPackageGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
+        VhdlRecordPackageGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
+        VhdlAxiLiteWrapperGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
+    else:
+        generate_sv(register_list, GEN_SV)
 
-    # VHDL: natively-typed record package (<name>_register_record_pkg.vhd)
-    VhdlRecordPackageGenerator(
-        register_list=register_list, output_folder=GEN_VHDL
-    ).create()
+    CHeaderGenerator(register_list=register_list, output_folder=GEN_C).create()
+    HtmlPageGenerator(register_list=register_list, output_folder=GEN_HTML).create()
 
-    # VHDL: AXI-Lite register file wrapper (<name>_register_file_axi_lite.vhd)
-    # This is the entity instantiated in <<NAME>>_top as u_regs.
-    VhdlAxiLiteWrapperGenerator(
-        register_list=register_list, output_folder=GEN_VHDL
-    ).create()
-
-    # C: register address/field header (<name>_regs.h)
-    CHeaderGenerator(
-        register_list=register_list, output_folder=GEN_C
-    ).create()
-
-    # HTML: register documentation page (<name>_regs.html)
-    HtmlPageGenerator(
-        register_list=register_list, output_folder=GEN_HTML
-    ).create()
+    autowire_top(name=name, language=language, register_list=register_list, repo_root=REPO_ROOT)
 
 
 def main() -> None:
-    for d in (GEN_VHDL, GEN_C, GEN_HTML):
+    for d in (GEN_VHDL, GEN_SV, GEN_C, GEN_HTML):
         d.mkdir(parents=True, exist_ok=True)
 
     toml_files = sorted(REGS_DIR.glob("*.toml"))
