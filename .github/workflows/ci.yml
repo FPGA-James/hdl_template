@@ -25,10 +25,10 @@ jobs:
 
       - name: Check for drift (regenerate and diff)
         run: |
-          cp -r gen/ gen_orig/
+          cp -r out/regs/ out_regs_orig/
           make regs
-          diff -rq gen_orig/ gen/ \
-            || (echo "ERROR: Regenerated files differ — commit the updated gen/ outputs." && exit 1)
+          diff -rq out_regs_orig/ out/regs/ \
+            || (echo "ERROR: Regenerated files differ — register generation is non-deterministic or make regs was run against a stale checkout." && exit 1)
 
   # ── VHDL lint (GHDL analysis + vsg) ─────────────────────────────────────────
   lint:

@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """Register generation script for the HDL template.
 
-Parses all TOML register definitions in regs/ and generates:
-  - VHDL register constants package       → out/regs/vhdl/
-  - VHDL typed record package             → out/regs/vhdl/
-  - VHDL AXI-Lite register file wrapper   → out/regs/vhdl/
-  - C header file                         → out/regs/c/
-  - HTML register documentation           → out/regs/html/ (linked by Sphinx)
+Parses all TOML register definitions in regs/ and generates, for the
+detected project language (VHDL or SystemVerilog):
+  - VHDL: register constants package, typed record package, and AXI-Lite
+    register file wrapper                  → out/regs/vhdl/
+  - SV: AXI-Lite register file module and types package (via PeakRDL-
+    regblock, post-processed for OSS Yosys synthesizability)
+                                            → out/regs/sv/
+  - C header file                          → out/regs/c/
+  - HTML register documentation            → out/regs/html/ (linked by Sphinx)
+
+Also auto-wires each register field to a matching `<name>_core` port,
+rewriting the marker-delimited region(s) of `<name>_top` -- see
+`autowire_top` below.
 
 Run via: make regs
 """
@@ -27,6 +34,11 @@ from hdl_registers.generator.systemverilog.axi_lite.register_file import (
 from hdl_registers.generator.c.header import CHeaderGenerator
 from hdl_registers.generator.html.page import HtmlPageGenerator
 from hdl_registers.field.bit_vector import BitVector
+
+
+# =============================================================================
+# Port parsing
+# =============================================================================
 
 
 @dataclass
@@ -100,13 +112,17 @@ def parse_sv_ports(core_file: Path) -> dict[str, Port]:
     return ports
 
 
+# =============================================================================
+# Field-to-port mapping
+# =============================================================================
+
+
 @dataclass
 class FieldMapping:
     """A single register field, resolved to the core port it drives/receives."""
 
     register_name: str
     field_name: str
-    field_type: type
     width: int
     direction: str  # "down" (host writes, core input) or "up" (host reads, core output)
     port_name: str
@@ -125,19 +141,20 @@ def build_field_mappings(register_list) -> list[FieldMapping]:
             direction, suffix = "up", "_o"
         else:
             raise ValueError(
-                f"Register '{register.name}' uses mode '{mode}', which the "
-                "SystemVerilog register-file generator does not support "
-                "(only r, w, r_w). Use a supported mode — see Task 1 of "
-                "docs/superpowers/plans/2026-08-17-register-autowiring.md "
-                "for the pattern used to replicate wpulse-style behavior "
-                "with a plain 'w' field plus a core-side edge detector."
+                f"Register '{register.name}' uses mode '{mode}', which "
+                "register auto-wiring does not support (only r, w, r_w — "
+                "this applies to VHDL and SystemVerilog projects alike, "
+                "since the wiring layer has no naming convention for other "
+                "modes yet). To replicate wpulse-style behavior, use a "
+                "plain 'w' field plus a core-side edge detector instead "
+                "(see the reset_count field in the example project's "
+                "register map and _core RTL for the pattern)."
             )
         for field in register.fields:
             mappings.append(
                 FieldMapping(
                     register_name=register.name,
                     field_name=field.name,
-                    field_type=type(field),
                     width=field.width,
                     direction=direction,
                     port_name=f"{field.name}{suffix}",
@@ -196,7 +213,7 @@ def build_passthrough_mappings(
     top_ports: dict[str, Port],
 ) -> dict[str, str]:
     """For core ports not covered by any register field (e.g. clk, rst_n),
-    connect them to an identically-named port on <<NAME>>_top."""
+    connect them to an identically-named port on the project's _top module."""
     covered = {m.port_name for m in field_mappings}
     passthrough: dict[str, str] = {}
     errors = []
@@ -206,7 +223,7 @@ def build_passthrough_mappings(
         if name not in top_ports:
             errors.append(
                 f"core port '{name}' is not a register-derived port and has "
-                "no matching port on <<NAME>>_top to pass through"
+                "no matching port on the project's _top module to pass through"
             )
             continue
         passthrough[name] = name
@@ -216,20 +233,33 @@ def build_passthrough_mappings(
         )
     return passthrough
 
+
+# =============================================================================
+# Marker-region rewrite and rendering
+# =============================================================================
+
+
 def rewrite_marker_region(
     file_path: Path, begin_marker: str, end_marker: str, new_content: str
 ) -> None:
     """Replace the text strictly between a BEGIN/END marker comment pair.
-    The markers themselves are preserved and left in place."""
+    The markers themselves are preserved and left in place. The END
+    marker's original indentation is preserved too -- captured from the
+    match rather than assumed, so this works regardless of how the marker
+    comment happens to be indented in the source file."""
     text = file_path.read_text()
-    pattern = re.compile(re.escape(begin_marker) + r".*?" + re.escape(end_marker), re.DOTALL)
-    if not pattern.search(text):
+    pattern = re.compile(
+        re.escape(begin_marker) + r".*?([ \t]*)" + re.escape(end_marker), re.DOTALL
+    )
+    match = pattern.search(text)
+    if not match:
         raise ValueError(
             f"Could not find marker region '{begin_marker}' ... "
             f"'{end_marker}' in {file_path}. Add the marker comment pair "
             "before running `make regs`."
         )
-    replacement = f"{begin_marker}\n{new_content}\n    {end_marker}"
+    end_indent = match.group(1)
+    replacement = f"{begin_marker}\n{new_content}\n{end_indent}{end_marker}"
     new_text = pattern.sub(lambda _match: replacement, text, count=1)
     file_path.write_text(new_text)
 
@@ -302,6 +332,11 @@ def render_sv_wiring_block(
     )
 
 
+# =============================================================================
+# SystemVerilog register-file generation
+# =============================================================================
+
+
 def _make_sv_synthesizable(text: str) -> str:
     """Rewrite PeakRDL-regblock's generated SystemVerilog so free/OSS Yosys's
     `read_verilog -sv` frontend can synthesize it. Two independent gaps,
@@ -356,6 +391,10 @@ def generate_sv(register_list, output_folder: Path) -> None:
         generated_file.write_text(_make_sv_synthesizable(generated_file.read_text()))
 
 
+# =============================================================================
+# Driver
+# =============================================================================
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REGS_DIR  = REPO_ROOT / "regs"
 GEN_VHDL  = REPO_ROOT / "out" / "regs" / "vhdl"
@@ -402,7 +441,7 @@ def _flat_core_and_top_exist(repo_root: Path, name: str, language: str) -> bool:
     """True only when the flat, post-`make init` src/ layout contains both
     <name>_core.<ext> and <name>_top.<ext> for this specific register list.
     Auto-wiring must never run against anything else: pre-init, the
-    pre-init nested src/vhdl/, src/sv/ layout has the TOML-derived name as
+    nested src/vhdl/, src/sv/ layout has the TOML-derived name as
     a template placeholder (e.g. "NAME"), and writing that literal name
     into <name>_top would corrupt the <<NAME>> token in a way `make init`
     cannot repair. Post-init, a second regs/*.toml with no matching
@@ -497,7 +536,10 @@ def main() -> None:
         generate_from_toml(toml_path)
 
     print("Register generation complete.")
-    print(f"  VHDL  → {GEN_VHDL}")
+    if detect_language(REPO_ROOT) == "vhdl":
+        print(f"  VHDL  → {GEN_VHDL}")
+    else:
+        print(f"  SV    → {GEN_SV}")
     print(f"  C     → {GEN_C}")
     print(f"  HTML  → {GEN_HTML}")
 

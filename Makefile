@@ -193,7 +193,7 @@ deps: ## Fetch HDL dependencies via Bender (resolved via `bender path`, not vend
 
 regs: out/regs/vhdl/.stamp ## Generate VHDL/C/HTML register files from regs/*.toml
 
-out/regs/vhdl/.stamp: $(wildcard regs/*.toml) scripts/gen_regs.py
+out/regs/vhdl/.stamp: $(wildcard regs/*.toml) scripts/gen_regs.py $(wildcard src/*_core.vhd src/*_core.sv)
 	$(call check-venv)
 	@printf "\n\033[1m  Generating register files...\033[0m\n\n"
 	@$(PYTHON) scripts/gen_regs.py
@@ -273,7 +273,7 @@ ifeq ($(TOPLEVEL_HDL),sv)
 	$(call check-rtl-list,$(SV_RTL),SV_RTL)
 	@printf "\n\033[1m  Synthesising $(TOPLEVEL) (SystemVerilog → Xilinx xc7)...\033[0m\n\n"
 	@$(OSS_CAD_SUITE)/bin/yosys -q \
-	  -l $(SYNTH_RDIR)/$(TOPLEVEL)_sv_synth.log \
+	  -l "$(SYNTH_RDIR)/$(TOPLEVEL)_sv_synth.log" \
 	  -p "read_verilog -sv $(SV_GEN) $(SV_RTL)" \
 	  -p "synth_xilinx -family xc7 -top $(TOPLEVEL) -edif out/synth/$(TOPLEVEL)_sv.edif" \
 	  -p "tee -o $(SYNTH_RDIR)/$(TOPLEVEL)_sv_check.txt check" \
@@ -287,7 +287,7 @@ else
 	$(call compile-ghdl-libs,out/synth/workdir)
 	@printf "  \033[2m[yosys]\033[0m Elaborating and synthesising...\n"
 	@$(OSS_CAD_SUITE)/bin/yosys -q \
-	  -l $(SYNTH_RDIR)/$(TOPLEVEL)_vhdl_synth.log \
+	  -l "$(SYNTH_RDIR)/$(TOPLEVEL)_vhdl_synth.log" \
 	  -p "plugin -i ghdl" \
 	  -p "ghdl --std=08 -Pout/synth/workdir $(VHDL_RTL) $(VHDL_GEN) -e $(TOPLEVEL)" \
 	  -p "synth_xilinx -family xc7 -top $(TOPLEVEL) -edif out/synth/$(TOPLEVEL)_vhdl.edif" \
@@ -341,7 +341,7 @@ impl: regs ## Place-and-route with nextpnr  [IMPL_FAMILY=ice40|ecp5  IMPL_DEVICE
 ifeq ($(TOPLEVEL_HDL),sv)
 	$(call check-rtl-list,$(SV_RTL),SV_RTL)
 	@$(OSS_CAD_SUITE)/bin/yosys -q \
-	  -l $(IMPL_RDIR)/$(IMPL_STEM)_synth.log \
+	  -l "$(IMPL_RDIR)/$(IMPL_STEM)_synth.log" \
 	  -p "read_verilog -sv $(SV_GEN) $(SV_RTL)" \
 	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json"
 else
@@ -349,7 +349,7 @@ else
 	$(call compile-ghdl-libs,out/synth/workdir)
 	@printf "  \033[2m[yosys]\033[0m Elaborating and mapping to $(IMPL_FAMILY)...\n"
 	@$(OSS_CAD_SUITE)/bin/yosys -q \
-	  -l $(IMPL_RDIR)/$(IMPL_STEM)_synth.log \
+	  -l "$(IMPL_RDIR)/$(IMPL_STEM)_synth.log" \
 	  -p "plugin -i ghdl" \
 	  -p "ghdl --std=08 -Pout/synth/workdir $(VHDL_RTL) $(VHDL_GEN) -e $(TOPLEVEL)" \
 	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json"
@@ -358,49 +358,49 @@ endif
 ifeq ($(IMPL_FAMILY),ice40)
 	@$(OSS_CAD_SUITE)/bin/nextpnr-ice40 -q \
 	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
-	  --json   out/impl/$(IMPL_STEM).json \
-	  --pcf    $(IMPL_CONSTRAINT) \
+	  --json   "out/impl/$(IMPL_STEM).json" \
+	  --pcf    "$(IMPL_CONSTRAINT)" \
 	  --pcf-allow-unconstrained \
-	  --asc    out/impl/$(IMPL_TOPLEVEL).asc \
-	  --write  $(IMPL_RDIR)/$(IMPL_STEM)_routed.json \
-	  --report $(IMPL_RDIR)/$(IMPL_STEM)_timing.json \
+	  --asc    "out/impl/$(IMPL_TOPLEVEL).asc" \
+	  --write  "$(IMPL_RDIR)/$(IMPL_STEM)_routed.json" \
+	  --report "$(IMPL_RDIR)/$(IMPL_STEM)_timing.json" \
 	  --detailed-timing-report \
-	  --sdf    $(IMPL_RDIR)/$(IMPL_STEM)_routed.sdf \
-	  --placed-svg $(IMPL_RDIR)/$(IMPL_STEM)_placed.svg \
-	  --routed-svg $(IMPL_RDIR)/$(IMPL_STEM)_routed.svg \
-	  -l       $(IMPL_RDIR)/$(IMPL_STEM)_pnr.log
+	  --sdf    "$(IMPL_RDIR)/$(IMPL_STEM)_routed.sdf" \
+	  --placed-svg "$(IMPL_RDIR)/$(IMPL_STEM)_placed.svg" \
+	  --routed-svg "$(IMPL_RDIR)/$(IMPL_STEM)_routed.svg" \
+	  -l       "$(IMPL_RDIR)/$(IMPL_STEM)_pnr.log"
 	@printf "  \033[2m[icepack]\033[0m Packing bitstream...\n"
-	@$(OSS_CAD_SUITE)/bin/icepack out/impl/$(IMPL_TOPLEVEL).asc out/impl/$(IMPL_TOPLEVEL).bit
+	@$(OSS_CAD_SUITE)/bin/icepack "out/impl/$(IMPL_TOPLEVEL).asc" "out/impl/$(IMPL_TOPLEVEL).bit"
 else ifeq ($(IMPL_FAMILY),ecp5)
 	@$(OSS_CAD_SUITE)/bin/nextpnr-ecp5 -q \
 	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
-	  --json      out/impl/$(IMPL_STEM).json \
-	  --lpf       $(IMPL_CONSTRAINT) \
-	  --textcfg   out/impl/$(IMPL_TOPLEVEL).config \
-	  --write     $(IMPL_RDIR)/$(IMPL_STEM)_routed.json \
-	  --report    $(IMPL_RDIR)/$(IMPL_STEM)_timing.json \
+	  --json      "out/impl/$(IMPL_STEM).json" \
+	  --lpf       "$(IMPL_CONSTRAINT)" \
+	  --textcfg   "out/impl/$(IMPL_TOPLEVEL).config" \
+	  --write     "$(IMPL_RDIR)/$(IMPL_STEM)_routed.json" \
+	  --report    "$(IMPL_RDIR)/$(IMPL_STEM)_timing.json" \
 	  --detailed-timing-report \
-	  --sdf       $(IMPL_RDIR)/$(IMPL_STEM)_routed.sdf \
-	  --placed-svg $(IMPL_RDIR)/$(IMPL_STEM)_placed.svg \
-	  --routed-svg $(IMPL_RDIR)/$(IMPL_STEM)_routed.svg \
-	  -l          $(IMPL_RDIR)/$(IMPL_STEM)_pnr.log
+	  --sdf       "$(IMPL_RDIR)/$(IMPL_STEM)_routed.sdf" \
+	  --placed-svg "$(IMPL_RDIR)/$(IMPL_STEM)_placed.svg" \
+	  --routed-svg "$(IMPL_RDIR)/$(IMPL_STEM)_routed.svg" \
+	  -l          "$(IMPL_RDIR)/$(IMPL_STEM)_pnr.log"
 	@printf "  \033[2m[ecppack]\033[0m Packing bitstream...\n"
-	@$(OSS_CAD_SUITE)/bin/ecppack --compress out/impl/$(IMPL_TOPLEVEL).config out/impl/$(IMPL_TOPLEVEL).bit
+	@$(OSS_CAD_SUITE)/bin/ecppack --compress "out/impl/$(IMPL_TOPLEVEL).config" "out/impl/$(IMPL_TOPLEVEL).bit"
 else ifeq ($(IMPL_FAMILY),machxo2)
 	@$(OSS_CAD_SUITE)/bin/nextpnr-machxo2 -q \
 	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
-	  --json      out/impl/$(IMPL_STEM).json \
-	  --lpf       $(IMPL_CONSTRAINT) \
-	  --textcfg   out/impl/$(IMPL_TOPLEVEL).config \
-	  --write     $(IMPL_RDIR)/$(IMPL_STEM)_routed.json \
-	  --report    $(IMPL_RDIR)/$(IMPL_STEM)_timing.json \
+	  --json      "out/impl/$(IMPL_STEM).json" \
+	  --lpf       "$(IMPL_CONSTRAINT)" \
+	  --textcfg   "out/impl/$(IMPL_TOPLEVEL).config" \
+	  --write     "$(IMPL_RDIR)/$(IMPL_STEM)_routed.json" \
+	  --report    "$(IMPL_RDIR)/$(IMPL_STEM)_timing.json" \
 	  --detailed-timing-report \
-	  --sdf       $(IMPL_RDIR)/$(IMPL_STEM)_routed.sdf \
-	  --placed-svg $(IMPL_RDIR)/$(IMPL_STEM)_placed.svg \
-	  --routed-svg $(IMPL_RDIR)/$(IMPL_STEM)_routed.svg \
-	  -l          $(IMPL_RDIR)/$(IMPL_STEM)_pnr.log
+	  --sdf       "$(IMPL_RDIR)/$(IMPL_STEM)_routed.sdf" \
+	  --placed-svg "$(IMPL_RDIR)/$(IMPL_STEM)_placed.svg" \
+	  --routed-svg "$(IMPL_RDIR)/$(IMPL_STEM)_routed.svg" \
+	  -l          "$(IMPL_RDIR)/$(IMPL_STEM)_pnr.log"
 	@printf "  \033[2m[ddtcmd]\033[0m Packing bitstream...\n"
-	@$(OSS_CAD_SUITE)/bin/ddtcmd -oft -bit -if out/impl/$(IMPL_TOPLEVEL).config -of out/impl/$(IMPL_TOPLEVEL).bit
+	@$(OSS_CAD_SUITE)/bin/ddtcmd -oft -bit -if "out/impl/$(IMPL_TOPLEVEL).config" -of "out/impl/$(IMPL_TOPLEVEL).bit"
 else
 	$(error Unknown IMPL_FAMILY=$(IMPL_FAMILY). Valid: ice40 | ecp5 | machxo2)
 endif
@@ -413,7 +413,7 @@ impl-gui: regs ## Open nextpnr interactive placement/routing GUI  [IMPL_FAMILY=i
 ifeq ($(TOPLEVEL_HDL),sv)
 	$(call check-rtl-list,$(SV_RTL),SV_RTL)
 	@$(OSS_CAD_SUITE)/bin/yosys -q \
-	  -l $(IMPL_RDIR)/$(IMPL_STEM)_synth.log \
+	  -l "$(IMPL_RDIR)/$(IMPL_STEM)_synth.log" \
 	  -p "read_verilog -sv $(SV_GEN) $(SV_RTL)" \
 	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json"
 else
@@ -421,7 +421,7 @@ else
 	$(call compile-ghdl-libs,out/synth/workdir)
 	@printf "  \033[2m[yosys]\033[0m Elaborating and mapping to $(IMPL_FAMILY)...\n"
 	@$(OSS_CAD_SUITE)/bin/yosys -q \
-	  -l $(IMPL_RDIR)/$(IMPL_STEM)_synth.log \
+	  -l "$(IMPL_RDIR)/$(IMPL_STEM)_synth.log" \
 	  -p "plugin -i ghdl" \
 	  -p "ghdl --std=08 -Pout/synth/workdir $(VHDL_RTL) $(VHDL_GEN) -e $(TOPLEVEL)" \
 	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json"
@@ -430,19 +430,19 @@ endif
 ifeq ($(IMPL_FAMILY),ice40)
 	@$(OSS_CAD_SUITE)/bin/nextpnr-ice40 --gui \
 	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
-	  --json out/impl/$(IMPL_STEM).json \
-	  --pcf  $(IMPL_CONSTRAINT) \
+	  --json "out/impl/$(IMPL_STEM).json" \
+	  --pcf  "$(IMPL_CONSTRAINT)" \
 	  --pcf-allow-unconstrained
 else ifeq ($(IMPL_FAMILY),ecp5)
 	@$(OSS_CAD_SUITE)/bin/nextpnr-ecp5 --gui \
 	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
-	  --json out/impl/$(IMPL_STEM).json \
-	  --lpf  $(IMPL_CONSTRAINT)
+	  --json "out/impl/$(IMPL_STEM).json" \
+	  --lpf  "$(IMPL_CONSTRAINT)"
 else ifeq ($(IMPL_FAMILY),machxo2)
 	@$(OSS_CAD_SUITE)/bin/nextpnr-machxo2 --gui \
 	  --$(IMPL_DEVICE) --package $(IMPL_PACKAGE) \
-	  --json out/impl/$(IMPL_STEM).json \
-	  --lpf  $(IMPL_CONSTRAINT)
+	  --json "out/impl/$(IMPL_STEM).json" \
+	  --lpf  "$(IMPL_CONSTRAINT)"
 else
 	$(error Unknown IMPL_FAMILY=$(IMPL_FAMILY). Valid: ice40 | ecp5 | machxo2)
 endif
@@ -546,7 +546,7 @@ lint-vhdl: regs ## GHDL analysis (type/syntax) + vsg style guide
 lint-sv: ## Verilator lint-only pass with all warnings enabled
 	@printf "\n\033[1m  Linting SystemVerilog...\033[0m\n\n"
 	@$(BENDER) script verilator -t rtl_sv -t gen_sv 2>/dev/null | \
-	  xargs $(OSS_CAD_SUITE)/bin/verilator --lint-only --top-module $(TOPLEVEL) -Wall -Wno-fatal
+	  xargs $(OSS_CAD_SUITE)/bin/verilator --lint-only --top-module "$(TOPLEVEL)" -Wall -Wno-fatal
 	@printf "\n\033[32m  ✓\033[0m SV lint passed\n\n"
 
 # =============================================================================

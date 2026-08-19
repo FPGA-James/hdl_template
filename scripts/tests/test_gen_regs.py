@@ -173,6 +173,17 @@ def test_rewrite_marker_region_is_idempotent(tmp_path):
     assert first == second
 
 
+def test_rewrite_marker_region_preserves_end_marker_indentation(tmp_path):
+    # Real project files indent the END marker to match surrounding code
+    # (e.g. 4 spaces inside a VHDL architecture body) -- the rewrite must
+    # preserve whatever indentation the file actually uses, not assume one.
+    path = tmp_path / "f.vhd"
+    path.write_text("    -- BEGIN X\n    old\n    -- END X\n")
+    gen_regs.rewrite_marker_region(path, "-- BEGIN X", "-- END X", "new")
+    assert "    -- END X" in path.read_text()
+    assert "        -- END X" not in path.read_text()
+
+
 def test_render_vhdl_signals_block_only_includes_cast_fields(demo_register_list):
     mappings = gen_regs.build_field_mappings(demo_register_list)
     block = gen_regs.render_vhdl_signals_block(mappings)
