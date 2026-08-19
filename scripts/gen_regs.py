@@ -437,7 +437,7 @@ def generate_from_toml(toml_path: Path) -> None:
     else:
         print(
             f"  Skipping _top auto-wiring for '{name}': no flat src/{name}_core.{{vhd,sv}} "
-            f"+ src/{name}_top.{{vhd,sv}} pair found (run \`make init\` first, or this "
+            f"+ src/{name}_top.{{vhd,sv}} pair found (run `make init` first, or this "
             "TOML has no matching core/top pair)."
         )
 

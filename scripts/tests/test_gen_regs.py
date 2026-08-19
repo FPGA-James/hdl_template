@@ -255,7 +255,7 @@ def test_detect_language_nested_pre_init_prefers_vhdl(tmp_path):
 
 def test_detect_language_raises_when_nothing_found(tmp_path):
     (tmp_path / "src").mkdir()
-    with pytest.raises(ValueError, match="run \`make init\` first"):
+    with pytest.raises(ValueError, match="run `make init` first"):
         gen_regs.detect_language(tmp_path)
 
 
