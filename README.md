@@ -11,7 +11,7 @@ Click **Use this template** to create your own repository, then run `make init N
 | Capability | Tools |
 |---|---|
 | **Dependency management** | [Bender](https://github.com/pulp-platform/bender) (primary) + [FuseSoC](https://fusesoc.readthedocs.io) (`template.core`) |
-| **Register generation** | [hdl-registers](https://hdl-registers.com) — TOML → VHDL package, AXI-Lite wrapper, C header, HTML |
+| **Register generation** | [hdl-registers](https://hdl-registers.com) — TOML → VHDL/SV register file, C header, HTML, with automatic field-to-port wiring into `<name>_top` |
 | **Simulation — VHDL** | GHDL + [VUnit](https://vunit.github.io) or [cocotb](https://www.cocotb.org), or native via [NVC](https://www.nickg.me.uk/nvc/) |
 | **Simulation — SV** | Verilator or Icarus Verilog + cocotb, or native via `verilator --binary` |
 | **Synthesis** | [Yosys](https://yosyshq.net/yosys/) targeting Xilinx XC7 (`synth_xilinx -family xc7`) |
@@ -150,7 +150,7 @@ make verible-ls      Generate verible.filelist for Verible
 | `IMPL_FAMILY` | `ice40` | `ice40` \| `ecp5` \| `machxo2` |
 | `IMPL_DEVICE` | `hx8k` | e.g. `hx1k`, `lfe5u-25f` |
 | `IMPL_PACKAGE` | `ct256` | e.g. `tq144`, `CABGA256` |
-| `IMPL_TOPLEVEL` | `NAME_core` | any entity with a matching constraint file |
+| `IMPL_TOPLEVEL` | `<<NAME>>_core` | any entity with a matching constraint file |
 | `ICESTUDIO` | `IceStudio` | app name (macOS) or binary (Linux) |
 
 **Compatibility:** `SIM=ghdl` requires `TOPLEVEL_HDL=vhdl`. `SIM=verilator` or `SIM=icarus` requires `TOPLEVEL_HDL=sv`. The cocotb Makefile enforces this with a guard.
@@ -252,6 +252,8 @@ GitHub Actions runs on every push and pull request:
 | `synth` | Yosys XC7 |
 | `test-autodoc` | pytest (HDLAutoDoc test suite) |
 | `smoke-test` (vhdl, sv matrix) | `scripts/smoke_test.sh` — the only job that runs `make init` first, then `regs`/`lsp`/every testbench flow/`lint`/`synth`/`html`/`coverage` against the initialised project |
+
+**Known gap:** every job above `smoke-test` runs directly against this repo's un-initialised checkout, where RTL/register-file paths still contain the literal `<<NAME>>` placeholder — `Bender.yml`'s own source lists use that same placeholder, so they only resolve to real files after `make init` has run. `lint`, `sim-vhdl-*`, `sim-sv-*`, and `synth` accordingly don't yet exercise real files pre-init. `smoke-test` is the reliable signal today; treat the others as informational until this is addressed.
 
 The `docs.yml` workflow builds Sphinx HTML and deploys to GitHub Pages on every push to `main`. Enable it under **Settings → Pages → Source: GitHub Actions**.
 
