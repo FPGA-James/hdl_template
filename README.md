@@ -78,7 +78,7 @@ Reads `regs/<name>_regs.toml` and writes to `out/regs/vhdl/` (VHDL projects) or 
 
 Naming convention (strict, no exceptions): a register field named `<leaf>` must have a matching `<name>_core` port named `<leaf>_i` (for `w`/`r_w` mode fields) or `<leaf>_o` (for `r` mode fields), and no two fields may share a leaf name (each must resolve to a distinct port). A `<name>_core` port that isn't matched by any field must have an identically-named port on `<name>_top` to pass through (e.g. `clk`, `rst_n`) — otherwise `make regs` fails, naming the exact field or port at fault.
 
-**Known limitation:** `make synth TOPLEVEL_HDL=sv` currently fails once a project's SV top is wired to a real generated register file — see `CLAUDE.md`'s "Known limitation" note for why.
+The generated SV register file needs light post-processing to stay synthesizable on free/OSS Yosys (PeakRDL-regblock's output isn't otherwise accepted by Yosys's SV frontend) — `make regs` handles this automatically. See `CLAUDE.md`'s "SV register-file synthesizability" note for details and one known residual gap (Icarus-based cocotb simulation, untested).
 
 ### 6 — Run the testbench
 

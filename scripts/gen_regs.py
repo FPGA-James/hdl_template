@@ -302,16 +302,58 @@ def render_sv_wiring_block(
     )
 
 
+def _make_sv_synthesizable(text: str) -> str:
+    """Rewrite PeakRDL-regblock's generated SystemVerilog so free/OSS Yosys's
+    `read_verilog -sv` frontend can synthesize it. Two independent gaps,
+    verified empirically against this project's real generated register
+    file with a full `synth` run (zero CHECK-pass problems, real gates
+    produced):
+
+    1. Every `struct { ... }` (the top-level typedefs AND their nested
+       anonymous members -- hwif_in/hwif_out are deeply nested) is
+       unpacked; Yosys only supports packed structs ("ERROR: Only PACKED
+       supported at this time"). Packing every level is required, not
+       just the outermost: SV forbids an unpacked member inside a packed
+       struct, and every leaf here is already a plain `logic`/`logic[N:0]`
+       (no dynamic arrays or queues), so packing the whole hierarchy is
+       safe. Already-packed structs (`struct packed {`, used for external
+       sub-word registers) are left alone -- the regex only matches
+       `struct {` with nothing between `struct` and `{`.
+    2. `automatic` local variables inside `always_comb` blocks aren't
+       parsed at all ("syntax error, unexpected TOK_AUTOMATIC"). Stripping
+       the keyword is safe here: these blocks never recurse and never run
+       concurrently with themselves, so automatic vs. implicit-static
+       storage has no behavioral difference.
+
+    Verified inert for existing consumers too: Verilator (lint-sv,
+    sim-cocotb-verilator, sim-native) accepts the rewritten file with the
+    same pre-existing, unrelated warnings as the original.
+    """
+    text = re.sub(r"\bstruct \{", "struct packed {", text)
+    text = re.sub(r"\bautomatic\s+", "", text)
+    return text
+
+
 def generate_sv(register_list, output_folder: Path) -> None:
     """Generate the SystemVerilog AXI-Lite register file and its types package.
     Uses flatten_axi_lite=True so the bus side is discrete signals (s_axil_*),
     not a bundled SV interface -- keeps the bus-side wiring convention close
     to this project's existing hand-written SV top and avoids depending on
     an external interface definition.
+
+    Post-processes both generated files (see `_make_sv_synthesizable`) so
+    the output is synthesizable by free/OSS Yosys, not just simulatable.
     """
     SystemVerilogAxiLiteGenerator(register_list=register_list, output_folder=output_folder).create(
         flatten_axi_lite=True
     )
+
+    for filename in (
+        f"{register_list.name}_register_file_axi_lite.sv",
+        f"{register_list.name}_register_file_axi_lite_pkg.sv",
+    ):
+        generated_file = output_folder / filename
+        generated_file.write_text(_make_sv_synthesizable(generated_file.read_text()))
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

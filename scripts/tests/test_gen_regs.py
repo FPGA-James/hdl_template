@@ -279,3 +279,51 @@ def test_flat_core_and_top_exist_false_when_top_missing(tmp_path):
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "other_core.vhd").write_text("-- stub\n")
     assert gen_regs._flat_core_and_top_exist(tmp_path, "other", "vhdl") is False
+
+
+def test_make_sv_synthesizable_packs_top_level_struct():
+    text = "typedef struct {\n    logic value;\n} demo__out_t;\n"
+    result = gen_regs._make_sv_synthesizable(text)
+    assert "typedef struct packed {" in result
+    assert "typedef struct {" not in result
+
+
+def test_make_sv_synthesizable_packs_nested_anonymous_structs():
+    # PeakRDL-regblock nests anonymous `struct { ... }` blocks inside a
+    # named typedef -- every level must be packed, not just the outer one,
+    # since SV forbids an unpacked member inside a packed struct.
+    text = (
+        "typedef struct {\n"
+        "    struct {\n"
+        "        logic value;\n"
+        "    } enable;\n"
+        "} field_storage_t;\n"
+    )
+    result = gen_regs._make_sv_synthesizable(text)
+    assert result.count("struct packed {") == 2
+    assert "struct {" not in result
+
+
+def test_make_sv_synthesizable_does_not_double_pack_already_packed_struct():
+    text = "typedef struct packed {\n    logic value;\n} rd_data_t;\n"
+    result = gen_regs._make_sv_synthesizable(text)
+    assert result.count("packed") == 1
+
+
+def test_make_sv_synthesizable_strips_automatic_keyword():
+    text = (
+        "always_comb begin\n"
+        "    automatic logic is_valid_addr;\n"
+        "    automatic logic is_valid_rw;\n"
+        "    is_valid_addr = '1;\n"
+        "end\n"
+    )
+    result = gen_regs._make_sv_synthesizable(text)
+    assert "automatic" not in result
+    assert "logic is_valid_addr;" in result
+    assert "logic is_valid_rw;" in result
+
+
+def test_make_sv_synthesizable_leaves_unrelated_text_untouched():
+    text = "module demo_top;\n    logic clk;\nendmodule\n"
+    assert gen_regs._make_sv_synthesizable(text) == text

@@ -61,25 +61,6 @@ step() {
     fi
 }
 
-# xfail_step <lang> <name> <reason> <command...> — like step, but a failure
-# is expected and accepted (recorded as XFAIL, does not set OVERALL). An
-# unexpected PASS is recorded as XPASS and DOES set OVERALL, so a future
-# upstream fix gets noticed instead of silently going stale.
-xfail_step() {
-    local lang="$1" name="$2" reason="$3"
-    shift 3
-    local logfile="$LOGDIR/${name// /_}.log"
-    printf "\033[1m▶ [%s] %s\033[0m (expected fail: %s) ... " "$lang" "$name" "$reason"
-    if "$@" >"$logfile" 2>&1; then
-        printf "\033[33mXPASS\033[0m  (unexpectedly passed -- update smoke_test.sh and CLAUDE.md)\n"
-        RESULTS+=("${lang}	${name}	XPASS")
-        OVERALL=1
-    else
-        printf "\033[33mXFAIL\033[0m  (known limitation, see CLAUDE.md)\n"
-        RESULTS+=("${lang}	${name}	XFAIL")
-    fi
-}
-
 run_lang() {
     local lang="$1"
     local dir="$ROOT_WORKDIR/$lang"
@@ -114,7 +95,7 @@ run_lang() {
         step "$lang" "lint-sv"              make lint-sv
         step "$lang" "sim-native"           make sim-native TOPLEVEL_HDL=sv
         step "$lang" "sim-cocotb-verilator" make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv
-        xfail_step "$lang" "synth" "PeakRDL-regblock unpacked structs vs Yosys OSS SV frontend, see CLAUDE.md" make synth TOPLEVEL_HDL=sv
+        step "$lang" "synth"                make synth TOPLEVEL_HDL=sv
     fi
 
     step "$lang" "html"            make html
