@@ -60,6 +60,7 @@ AUTODOC_REPORTSDIR     = out/reports
 VHDL_RTL  = $(shell $(BENDER) script flist -t rtl_vhdl  --no-default-target 2>/dev/null)
 SV_RTL    = $(shell $(BENDER) script flist -t rtl_sv    --no-default-target 2>/dev/null)
 VHDL_GEN  = $(shell $(BENDER) script flist -t gen_vhdl  --no-default-target 2>/dev/null)
+SV_GEN    = $(shell $(BENDER) script flist -t gen_sv    --no-default-target 2>/dev/null)
 
 # ── hdl-modules VHDL packages required by the generated register file ─────────
 # Compiled into named libraries before the main sources so that
@@ -273,7 +274,7 @@ ifeq ($(TOPLEVEL_HDL),sv)
 	@printf "\n\033[1m  Synthesising $(TOPLEVEL) (SystemVerilog → Xilinx xc7)...\033[0m\n\n"
 	@$(OSS_CAD_SUITE)/bin/yosys -q \
 	  -l $(SYNTH_RDIR)/$(TOPLEVEL)_sv_synth.log \
-	  -p "read_verilog -sv $(SV_RTL)" \
+	  -p "read_verilog -sv $(SV_GEN) $(SV_RTL)" \
 	  -p "synth_xilinx -family xc7 -top $(TOPLEVEL) -edif out/synth/$(TOPLEVEL)_sv.edif" \
 	  -p "tee -o $(SYNTH_RDIR)/$(TOPLEVEL)_sv_check.txt check" \
 	  -p "tee -o $(SYNTH_RDIR)/$(TOPLEVEL)_sv_util.txt stat -tech xilinx" \
@@ -341,7 +342,7 @@ ifeq ($(TOPLEVEL_HDL),sv)
 	$(call check-rtl-list,$(SV_RTL),SV_RTL)
 	@$(OSS_CAD_SUITE)/bin/yosys -q \
 	  -l $(IMPL_RDIR)/$(IMPL_STEM)_synth.log \
-	  -p "read_verilog -sv $(SV_RTL)" \
+	  -p "read_verilog -sv $(SV_GEN) $(SV_RTL)" \
 	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json"
 else
 	$(call check-rtl-list,$(VHDL_RTL),VHDL_RTL)
@@ -413,7 +414,7 @@ ifeq ($(TOPLEVEL_HDL),sv)
 	$(call check-rtl-list,$(SV_RTL),SV_RTL)
 	@$(OSS_CAD_SUITE)/bin/yosys -q \
 	  -l $(IMPL_RDIR)/$(IMPL_STEM)_synth.log \
-	  -p "read_verilog -sv $(SV_RTL)" \
+	  -p "read_verilog -sv $(SV_GEN) $(SV_RTL)" \
 	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json"
 else
 	$(call check-rtl-list,$(VHDL_RTL),VHDL_RTL)
@@ -544,7 +545,7 @@ lint-vhdl: regs ## GHDL analysis (type/syntax) + vsg style guide
 
 lint-sv: ## Verilator lint-only pass with all warnings enabled
 	@printf "\n\033[1m  Linting SystemVerilog...\033[0m\n\n"
-	@$(BENDER) script verilator -t rtl_sv 2>/dev/null | \
+	@$(BENDER) script verilator -t rtl_sv -t gen_sv 2>/dev/null | \
 	  xargs $(OSS_CAD_SUITE)/bin/verilator --lint-only --top-module $(TOPLEVEL) -Wall -Wno-fatal
 	@printf "\n\033[32m  ✓\033[0m SV lint passed\n\n"
 

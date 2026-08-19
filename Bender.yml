@@ -21,6 +21,7 @@ dependencies:
 #   rtl_vhdl   — VHDL RTL sources (included for VHDL simulation and synthesis)
 #   rtl_sv     — SystemVerilog RTL sources
 #   gen_vhdl   — Generated VHDL register files (produced by `make regs`)
+#   gen_sv     — Generated SystemVerilog register files (produced by `make regs`)
 #   tb_vhdl    — VHDL testbench sources (simulation only)
 
 sources:
@@ -46,6 +47,16 @@ sources:
       - src/sv/<<NAME>>_pkg.sv
       - src/sv/<<NAME>>_core.sv
       - src/sv/<<NAME>>_top.sv
+
+  # ── Generated SystemVerilog register files (from `make regs`) ─────────────
+  # Package first: the register file module's ports are typed using the
+  # package's struct types, so it must be visible before that module is
+  # parsed. Listed under a separate target (mirrors gen_vhdl) so they can be
+  # included independently during linting and synthesis.
+  - target: gen_sv
+    files:
+      - out/regs/sv/<<NAME>>_register_file_axi_lite_pkg.sv
+      - out/regs/sv/<<NAME>>_register_file_axi_lite.sv
 
   # ── VHDL testbench (VUnit, simulation only) ────────────────────────────────
   - target: all(simulation, tb_vhdl)
