@@ -162,7 +162,7 @@ The generated AXI-Lite entity requires the `hdl-modules` library (fetched via `m
 
 For SystemVerilog projects, `make regs` instead generates `out/regs/sv/<name>_register_file_axi_lite.sv` and `out/regs/sv/<name>_register_file_axi_lite_pkg.sv` via PeakRDL-regblock (through `hdl_registers`' SystemVerilog generator, `flatten_axi_lite=True`).
 
-`make regs` also auto-wires each register field to a matching `<name>_core` port, rewriting only the marker-delimited region (`-- BEGIN/END AUTOGEN REGISTERS` / `// BEGIN/END AUTOGEN REGISTERS`) inside `<name>_top` — see the "Known limitation" note above for the one gap in SV synthesis support this introduces.
+`make regs` also auto-wires each register field to a matching `<name>_core` port, rewriting only the marker-delimited region(s) inside `<name>_top` (VHDL: `-- BEGIN/END AUTOGEN REGISTER SIGNALS` plus `-- BEGIN/END AUTOGEN REGISTERS`; SV: `// BEGIN/END AUTOGEN REGISTERS`). Field leaf names must be unique across the whole register map (each resolves to a distinct `<name>_core` port) — see the "Known limitation" note above for the one gap in SV synthesis support this introduces.
 
 ### Documentation Pipeline
 
