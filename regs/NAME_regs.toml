@@ -6,7 +6,7 @@
 #
 # Register hierarchy:
 #   conf    (r_w)    — counter configuration written by host
-#   command (wpulse) — one-shot commands (self-clearing on read)
+#   command (w)      — one-shot commands (core derives a one-cycle pulse internally)
 #   status  (r)      — counter status driven by <<NAME>>_core
 
 
@@ -30,12 +30,12 @@ default_value = 1
 
 # ── command: One-shot commands ────────────────────────────────────────────────
 [command]
-mode = "wpulse"
-description = "One-shot command register. Each field pulses high for one clock cycle on write."
+mode = "w"
+description = "One-shot command register. Field is a held level; <<NAME>>_core derives a one-cycle internal pulse from it (see reset_count_i in <<NAME>>_core)."
 
-[command.reset_counter]
+[command.reset_count]
 type = "bit"
-description = "Write 1 to reset the pulse count to zero. Automatically clears."
+description = "Write 1 to reset the pulse count to zero. Software must write 0 back afterwards."
 default_value = "0"
 
 

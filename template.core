@@ -29,6 +29,13 @@ filesets:
       - src/sv/<<NAME>>_top.sv
     file_type: systemVerilogSource
 
+  gen_sv:
+    description: "Generated SystemVerilog register files (run make regs first)"
+    files:
+      - out/regs/sv/<<NAME>>_register_file_axi_lite_pkg.sv
+      - out/regs/sv/<<NAME>>_register_file_axi_lite.sv
+    file_type: systemVerilogSource
+
   tb_vhdl:
     description: "VHDL testbench (VUnit)"
     files:
@@ -55,6 +62,7 @@ targets:
   sim_sv:
     filesets:
       - rtl_sv
+      - gen_sv
     toplevel: <<NAME>>_top
     default_tool: icarus
 

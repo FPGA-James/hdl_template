@@ -55,7 +55,7 @@ def bender_flist(*targets: str) -> list[Path]:
 def main() -> None:
     print("Generating verible.filelist...")
 
-    files = bender_flist("rtl_sv")
+    files = bender_flist("rtl_sv") + bender_flist("gen_sv")
 
     if not files:
         print(

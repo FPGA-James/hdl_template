@@ -6,7 +6,8 @@
 // Register interface:
 //   enable_i      -- enables counting
 //   increment_i   -- step size per pulse (1..255)
-//   reset_count_i -- one-cycle pulse clears the count
+//   reset_count_i -- held-level request, core derives a one-cycle internal
+//                    pulse from the rising edge
 //   enabled_o     -- high when counter is active
 //   pulse_count_o -- current count value
 //
@@ -26,7 +27,8 @@ module <<NAME>>_core
     input  logic              enable_i,
     // Step size added to count on each qualifying pulse.
     input  int unsigned       increment_i,
-    // One-cycle reset pulse. Clears count on the next rising edge.
+    // Held-level reset request. Core detects the rising edge internally and
+    // clears the count for exactly one cycle.
     input  logic              reset_count_i,
 
     // ── To register block ───────────────────────────────────────────────────
@@ -39,14 +41,24 @@ module <<NAME>>_core
     logic [COUNT_W:0] count_ext;  // one extra bit for saturation detection
     logic [COUNT_W-1:0] count_r;
 
+    // Registered previous value of reset_count_i, used to derive a
+    // one-cycle internal pulse from what is now a held-level input (the
+    // register file no longer auto-clears it after one cycle).
+    logic reset_count_prev;
+    logic reset_count_pulse;
+
+    assign reset_count_pulse = reset_count_i & ~reset_count_prev;
+
     // p_count: Clocked pulse counter with saturating addition.
     //
-    // Priority: reset > reset_count_i > counting
+    // Priority: reset > reset_count pulse > counting
     always_ff @(posedge clk) begin
+        reset_count_prev <= reset_count_i;
+
         if (!rst_n) begin
             count_r   <= '0;
             enabled_o <= 1'b0;
-        end else if (reset_count_i) begin
+        end else if (reset_count_pulse) begin
             count_r   <= '0;
             enabled_o <= enable_i;
         end else if (enable_i) begin

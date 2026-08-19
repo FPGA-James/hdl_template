@@ -14,6 +14,8 @@ All HDL tools (GHDL, Yosys, Verilator, Icarus, nextpnr) are expected to come fro
 
 **Known macOS gap**: `make html`/`make pdf`/`make coverage` can crash on import with `OSError: cannot load library 'libxcb.dylib'`. This is `sphinxcontrib.wavedrom` unconditionally importing `cairosvg` → `cairocffi` → `xcffib` at module-import time — `xcffib` needs `libxcb.dylib` resolvable via `cffi`'s `dlopen()`, which behaves differently from `ctypes.util.find_library()` and isn't satisfied by `brew install cairo` alone (`DYLD_LIBRARY_PATH=/opt/homebrew/lib` fixes `find_library()` but not the `make`-spawned Sphinx subprocess, likely SIP stripping `DYLD_*`). This triggers regardless of whether the project actually uses any `.. wavedrom::` directive or `SCHEMATICS=1`. Third-party packaging issue (`xcffib`/`cairocffi` on macOS), not fixable by editing this repo. Untested whether Linux CI hits the same gap.
 
+**Known limitation — `make synth TOPLEVEL_HDL=sv` with a real register file**: once a project's `<name>_top.sv` is wired to the generated AXI-Lite register file (via `make regs`, using the register auto-wiring feature — see `regs/<name>_regs.toml` and the `-- BEGIN/END AUTOGEN REGISTERS` markers), `make synth TOPLEVEL_HDL=sv` fails with `ERROR: Only PACKED supported at this time`. `hdl_registers`' SystemVerilog generator delegates to PeakRDL-regblock, which unconditionally emits **unpacked** SV structs for its `hwif_in`/`hwif_out` types (no config flag to make it emit packed structs), and free/OSS Yosys's native `read_verilog -sv` frontend does not support unpacked structs for synthesis. VHDL is unaffected (hdl_registers' VHDL generator uses records, not this construct) — this is SV-only. `make lint-sv`, `make sim-native TOPLEVEL_HDL=sv`, and `make regs` all work fine, since Verilator (lint/sim) and the Python generator itself have no such restriction; only Yosys-based synthesis (`make synth`/`make impl`) hits this. Fixing it would need a struct-flattening pre-pass on the generated package or a different SV register-file generator — out of scope for a template-level fix. Not fixable by editing this repo alone; tracked as a known gap.
+
 ## Initial Setup (one-time)
 
 ```bash
@@ -157,6 +159,10 @@ Register definitions live in `regs/<name>_regs.toml` using the `hdl_registers` T
 - `out/regs/html/<name>_regs.html` — register documentation
 
 The generated AXI-Lite entity requires the `hdl-modules` library (fetched via `make deps`).
+
+For SystemVerilog projects, `make regs` instead generates `out/regs/sv/<name>_register_file_axi_lite.sv` and `out/regs/sv/<name>_register_file_axi_lite_pkg.sv` via PeakRDL-regblock (through `hdl_registers`' SystemVerilog generator, `flatten_axi_lite=True`).
+
+`make regs` also auto-wires each register field to a matching `<name>_core` port, rewriting only the marker-delimited region(s) inside `<name>_top` (VHDL: `-- BEGIN/END AUTOGEN REGISTER SIGNALS` plus `-- BEGIN/END AUTOGEN REGISTERS`; SV: `// BEGIN/END AUTOGEN REGISTERS`). Field leaf names must be unique across the whole register map (each resolves to a distinct `<name>_core` port) — see the "Known limitation" note above for the one gap in SV synthesis support this introduces.
 
 ### Documentation Pipeline
 
