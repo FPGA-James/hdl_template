@@ -6,7 +6,8 @@
 // Register interface:
 //   enable_i      -- enables counting
 //   increment_i   -- step size per pulse (1..255)
-//   reset_count_i -- one-cycle pulse clears the count
+//   reset_count_i -- held-level request, core derives a one-cycle internal
+//                    pulse from the rising edge
 //   enabled_o     -- high when counter is active
 //   pulse_count_o -- current count value
 //

@@ -231,3 +231,51 @@ def test_render_sv_wiring_block_contains_expected_connections(demo_register_list
     assert ".enabled_o(hwif_in.status.enabled.next)" in block
     # SV struct fields are directly compatible -- no bridging signal needed.
     assert ".pulse_count_o(hwif_in.status.pulse_count.next)" in block
+
+
+def test_detect_language_flat_vhdl(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "demo_core.vhd").write_text("-- stub\n")
+    assert gen_regs.detect_language(tmp_path) == "vhdl"
+
+
+def test_detect_language_flat_sv(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "demo_core.sv").write_text("// stub\n")
+    assert gen_regs.detect_language(tmp_path) == "sv"
+
+
+def test_detect_language_nested_pre_init_prefers_vhdl(tmp_path):
+    (tmp_path / "src" / "vhdl").mkdir(parents=True)
+    (tmp_path / "src" / "sv").mkdir(parents=True)
+    (tmp_path / "src" / "vhdl" / "demo_core.vhd").write_text("-- stub\n")
+    (tmp_path / "src" / "sv" / "demo_core.sv").write_text("// stub\n")
+    assert gen_regs.detect_language(tmp_path) == "vhdl"
+
+
+def test_detect_language_raises_when_nothing_found(tmp_path):
+    (tmp_path / "src").mkdir()
+    with pytest.raises(ValueError, match="run \`make init\` first"):
+        gen_regs.detect_language(tmp_path)
+
+
+def test_flat_core_and_top_exist_true_when_both_present(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "demo_core.vhd").write_text("-- stub\n")
+    (tmp_path / "src" / "demo_top.vhd").write_text("-- stub\n")
+    assert gen_regs._flat_core_and_top_exist(tmp_path, "demo", "vhdl") is True
+
+
+def test_flat_core_and_top_exist_false_for_nested_layout(tmp_path):
+    # Simulates the pre-init repo layout: core exists, but nested, not flat.
+    (tmp_path / "src" / "vhdl").mkdir(parents=True)
+    (tmp_path / "src" / "vhdl" / "demo_core.vhd").write_text("-- stub\n")
+    (tmp_path / "src" / "vhdl" / "demo_top.vhd").write_text("-- stub\n")
+    assert gen_regs._flat_core_and_top_exist(tmp_path, "demo", "vhdl") is False
+
+
+def test_flat_core_and_top_exist_false_when_top_missing(tmp_path):
+    # Simulates a second regs/*.toml with no matching top file.
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "other_core.vhd").write_text("-- stub\n")
+    assert gen_regs._flat_core_and_top_exist(tmp_path, "other", "vhdl") is False

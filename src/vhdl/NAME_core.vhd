@@ -13,7 +13,8 @@ use work.<<NAME>>_pkg.all;
 -- Register interface:
 --   enable_i      -- from conf register; enables counting
 --   increment_i   -- from conf register; step size per pulse (1..255)
---   reset_count_i -- from command register; one-cycle pulse clears count
+--   reset_count_i -- from command register; held-level request, core
+--                    derives a one-cycle internal pulse from the rising edge
 --   enabled_o     -- to status register; high when counter is active
 --   pulse_count_o -- to status register; current count value
 --

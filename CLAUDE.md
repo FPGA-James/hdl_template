@@ -160,6 +160,10 @@ Register definitions live in `regs/<name>_regs.toml` using the `hdl_registers` T
 
 The generated AXI-Lite entity requires the `hdl-modules` library (fetched via `make deps`).
 
+For SystemVerilog projects, `make regs` instead generates `out/regs/sv/<name>_register_file_axi_lite.sv` and `out/regs/sv/<name>_register_file_axi_lite_pkg.sv` via PeakRDL-regblock (through `hdl_registers`' SystemVerilog generator, `flatten_axi_lite=True`).
+
+`make regs` also auto-wires each register field to a matching `<name>_core` port, rewriting only the marker-delimited region (`-- BEGIN/END AUTOGEN REGISTERS` / `// BEGIN/END AUTOGEN REGISTERS`) inside `<name>_top` — see the "Known limitation" note above for the one gap in SV synthesis support this introduces.
+
 ### Documentation Pipeline
 
 The HDL AutoDoc scripts themselves live in the `submodules/HDLAutoDoc` git submodule (not vendored into `scripts/`) — `AUTODOC_SCRIPTDIR` in the Makefile points there directly, so updates come from `git submodule update --remote`. `docs/conf.py`, `docs/_static/`, and `docs/_templates/` are project-owned copies (not referenced from the submodule), since they carry local customisations — see the note in `docs/conf.py` before syncing theme/template changes from upstream.

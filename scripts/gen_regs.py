@@ -148,9 +148,23 @@ def build_field_mappings(register_list) -> list[FieldMapping]:
 
 
 def resolve_port_mappings(mappings: list[FieldMapping], core_ports: dict[str, Port]) -> None:
-    """Verify every field maps to an existing core port with the matching direction.
-    Raises ValueError listing every problem found, not just the first."""
+    """Verify every field maps to an existing core port with the matching direction,
+    and that no two fields target the same core port. Raises ValueError listing
+    every problem found, not just the first."""
     errors = []
+
+    port_name_owners: dict[str, list[FieldMapping]] = {}
+    for mapping in mappings:
+        port_name_owners.setdefault(mapping.port_name, []).append(mapping)
+    for port_name, owners in port_name_owners.items():
+        if len(owners) > 1:
+            fields = ", ".join(f"'{m.register_name}.{m.field_name}'" for m in owners)
+            errors.append(
+                f"core port '{port_name}' is targeted by multiple register fields "
+                f"({fields}) -- register field leaf names must be unique across "
+                "the whole register map when auto-wiring a single core"
+            )
+
     for mapping in mappings:
         port = core_ports.get(mapping.port_name)
         if port is None:
@@ -342,6 +356,21 @@ def _core_src_dir(repo_root: Path, language: str) -> Path:
     raise ValueError(f"No *_core.{ext} found under {src_dir} or {nested}")
 
 
+def _flat_core_and_top_exist(repo_root: Path, name: str, language: str) -> bool:
+    """True only when the flat, post-`make init` src/ layout contains both
+    <name>_core.<ext> and <name>_top.<ext> for this specific register list.
+    Auto-wiring must never run against anything else: pre-init, the
+    pre-init nested src/vhdl/, src/sv/ layout has the TOML-derived name as
+    a template placeholder (e.g. "NAME"), and writing that literal name
+    into <name>_top would corrupt the <<NAME>> token in a way `make init`
+    cannot repair. Post-init, a second regs/*.toml with no matching
+    <name>_core/<name>_top pair should be skipped, not crash.
+    """
+    ext = "vhd" if language == "vhdl" else "sv"
+    src_dir = repo_root / "src"
+    return (src_dir / f"{name}_core.{ext}").is_file() and (src_dir / f"{name}_top.{ext}").is_file()
+
+
 def autowire_top(name: str, language: str, register_list, repo_root: Path) -> None:
     """Regenerate the marker-delimited register-wiring region(s) in <name>_top."""
     src_dir = _core_src_dir(repo_root, language)
@@ -403,7 +432,14 @@ def generate_from_toml(toml_path: Path) -> None:
     CHeaderGenerator(register_list=register_list, output_folder=GEN_C).create()
     HtmlPageGenerator(register_list=register_list, output_folder=GEN_HTML).create()
 
-    autowire_top(name=name, language=language, register_list=register_list, repo_root=REPO_ROOT)
+    if _flat_core_and_top_exist(REPO_ROOT, name, language):
+        autowire_top(name=name, language=language, register_list=register_list, repo_root=REPO_ROOT)
+    else:
+        print(
+            f"  Skipping _top auto-wiring for '{name}': no flat src/{name}_core.{{vhd,sv}} "
+            f"+ src/{name}_top.{{vhd,sv}} pair found (run \`make init\` first, or this "
+            "TOML has no matching core/top pair)."
+        )
 
 
 def main() -> None:
@@ -425,4 +461,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except ValueError as e:
+        print(f"\n  ERROR: {e}\n")
+        raise SystemExit(1)

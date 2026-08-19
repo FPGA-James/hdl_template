@@ -72,7 +72,13 @@ Runs `bender update`, fetching external repos (including `hdl-modules` for the A
 make regs
 ```
 
-Reads `regs/<name>_regs.toml` and writes to `out/regs/vhdl/`, `out/regs/c/`, and `out/regs/html/`.
+Reads `regs/<name>_regs.toml` and writes to `out/regs/vhdl/` (VHDL projects) or `out/regs/sv/` (SystemVerilog projects), plus `out/regs/c/` and `out/regs/html/` either way.
+
+**Register auto-wiring:** `make regs` also automatically wires each register field to a matching port on `<name>_core`, inside a marker-delimited region of `<name>_top` (between `-- BEGIN/END AUTOGEN REGISTERS` comments for VHDL, `// BEGIN/END AUTOGEN REGISTERS` for SV). Everything else in `<name>_top` — ports, the register-file instantiation, any other logic — is yours to hand-edit freely; only the marked region is regenerated and must never be hand-edited.
+
+Naming convention (strict, no exceptions): a register field named `<leaf>` must have a matching `<name>_core` port named `<leaf>_i` (for `w`/`r_w` mode fields) or `<leaf>_o` (for `r` mode fields). A `<name>_core` port that isn't matched by any field must have an identically-named port on `<name>_top` to pass through (e.g. `clk`, `rst_n`) — otherwise `make regs` fails, naming the exact field or port at fault.
+
+**Known limitation:** `make synth TOPLEVEL_HDL=sv` currently fails once a project's SV top is wired to a real generated register file — see `CLAUDE.md`'s "Known limitation" note for why.
 
 ### 6 — Run the testbench
 
