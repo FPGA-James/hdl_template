@@ -28,6 +28,9 @@ from hdl_registers.parser.toml import from_toml
 from hdl_registers.generator.vhdl.register_package import VhdlRegisterPackageGenerator
 from hdl_registers.generator.vhdl.record_package import VhdlRecordPackageGenerator
 from hdl_registers.generator.vhdl.axi_lite.wrapper import VhdlAxiLiteWrapperGenerator
+from hdl_registers.generator.vhdl.simulation.read_write_package import (
+    VhdlSimulationReadWritePackageGenerator,
+)
 from hdl_registers.generator.systemverilog.axi_lite.register_file import (
     SystemVerilogAxiLiteGenerator,
 )
@@ -507,6 +510,7 @@ def generate_from_toml(toml_path: Path) -> None:
         VhdlRegisterPackageGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
         VhdlRecordPackageGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
         VhdlAxiLiteWrapperGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
+        VhdlSimulationReadWritePackageGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
     else:
         generate_sv(register_list, GEN_SV)
 
