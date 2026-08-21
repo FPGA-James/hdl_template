@@ -32,6 +32,7 @@ filesets:
   gen_sv:
     description: "Generated SystemVerilog register files (run make regs first)"
     files:
+      - out/regs/sv/<<NAME>>_regs_addr_pkg.sv
       - out/regs/sv/<<NAME>>_register_file_axi_lite_pkg.sv
       - out/regs/sv/<<NAME>>_register_file_axi_lite.sv
     file_type: systemVerilogSource

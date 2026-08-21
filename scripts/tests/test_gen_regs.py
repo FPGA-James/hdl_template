@@ -338,3 +338,24 @@ def test_make_sv_synthesizable_strips_automatic_keyword():
 def test_make_sv_synthesizable_leaves_unrelated_text_untouched():
     text = "module demo_top;\n    logic clk;\nendmodule\n"
     assert gen_regs._make_sv_synthesizable(text) == text
+
+
+def test_render_sv_address_constants_computes_byte_addresses(demo_register_list):
+    # Deliberately lowercase names (demo_conf_addr, not DEMO_CONF_ADDR) --
+    # matching this project's own existing VHDL constant convention
+    # (<name>_regs_pkg.vhd's demo_conf/demo_command/demo_status are
+    # lowercase too), and critically so a <<NAME>>-template-substituted
+    # testbench file can reference them: <<NAME>>_conf_addr becomes
+    # myproject_conf_addr post-init, matching this exactly. An uppercased
+    # name could never be produced by <<NAME>> substitution, which is a
+    # literal, case-preserving text replacement.
+    text = gen_regs.render_sv_address_constants(demo_register_list)
+    assert "localparam int unsigned demo_conf_addr = 4 * 0;" in text
+    assert "localparam int unsigned demo_command_addr = 4 * 1;" in text
+    assert "localparam int unsigned demo_status_addr = 4 * 2;" in text
+
+
+def test_render_sv_address_constants_wraps_in_named_package(demo_register_list):
+    text = gen_regs.render_sv_address_constants(demo_register_list)
+    assert text.startswith("package demo_regs_addr_pkg;")
+    assert text.strip().endswith("endpackage")

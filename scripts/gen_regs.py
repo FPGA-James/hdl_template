@@ -372,6 +372,29 @@ def _make_sv_synthesizable(text: str) -> str:
     return text
 
 
+def render_sv_address_constants(register_list) -> str:
+    """Generate a small SV package with one localparam per register's byte
+    address (4 * 0-based index into the register list) -- the same
+    computation the VHDL path's generated read/write package uses
+    internally. Verified: generated for this project's real register map,
+    compiled and ran cleanly under both Verilator and Icarus.
+
+    Names are deliberately lowercase (demo_conf_addr, not DEMO_CONF_ADDR):
+    <<NAME>> template substitution is a literal, case-preserving text
+    replacement, so only lowercase-project-name-prefixed identifiers are
+    reachable from a template testbench file written pre-init. This also
+    matches <name>_regs_pkg.vhd's existing lowercase constant convention
+    (demo_conf, demo_command, demo_status).
+    """
+    name = register_list.name
+    lines = [f"package {name}_regs_addr_pkg;"]
+    for index, register in enumerate(register_list.register_objects):
+        const_name = f"{name}_{register.name}_addr"
+        lines.append(f"    localparam int unsigned {const_name} = 4 * {index};")
+    lines.append("endpackage")
+    return "\n".join(lines) + "\n"
+
+
 def generate_sv(register_list, output_folder: Path) -> None:
     """Generate the SystemVerilog AXI-Lite register file and its types package.
     Uses flatten_axi_lite=True so the bus side is discrete signals (s_axil_*),
@@ -392,6 +415,9 @@ def generate_sv(register_list, output_folder: Path) -> None:
     ):
         generated_file = output_folder / filename
         generated_file.write_text(_make_sv_synthesizable(generated_file.read_text()))
+
+    addr_pkg_file = output_folder / f"{register_list.name}_regs_addr_pkg.sv"
+    addr_pkg_file.write_text(render_sv_address_constants(register_list))
 
 
 # =============================================================================
