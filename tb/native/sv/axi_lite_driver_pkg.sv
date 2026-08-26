@@ -9,13 +9,15 @@
 // long as the axil_write/axil_read task signatures stay the same.
 //
 // Both tasks poll all of their channel's handshake signals in a single
-// per-cycle loop rather than one dedicated wait per signal. A slave that
-// asserts bvalid/rvalid for exactly one cycle (e.g. one that accepts aw
-// and w whenever both happen to be valid, with no separate backpressure)
-// can pulse its response before a sequential "wait for awready, then wait
-// for wready, then wait for bvalid" driver ever gets around to sampling
-// it -- verified empirically against a minimal always-ready AXI-Lite
-// slave under Verilator, where the sequential form hung indefinitely.
+// per-cycle loop rather than one dedicated wait per signal. A slave whose
+// bvalid/rvalid is registered (asserted for exactly one cycle immediately
+// after accepting aw+w or ar, decoupled from those request signals in the
+// same timestep -- true of any synthesizable AXI-Lite slave, including
+// this project's hdl_registers-generated register file) can pulse its
+// response before a sequential "wait for awready, then wait for wready,
+// then wait for bvalid" driver ever gets around to sampling it --
+// verified empirically against a minimal always-ready AXI-Lite slave
+// under Verilator, where the sequential form hung indefinitely.
 // Assignments to the ref'd bus signals use blocking (=), not non-blocking
 // (<=): Verilator does not propagate a non-blocking assignment made
 // through a ref parameter to other processes observing the aliased net
