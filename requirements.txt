@@ -16,6 +16,10 @@
 # add_vhdl_builtins() explicitly instead, which run.py already does).
 vunit-hdl>=5.0.0.dev5
 cocotb>=2.0
+# cocotbext-axi: drives <name>_top's real AXI-Lite register interface from
+# tb/cocotb/test_NAME.py (AxiLiteMaster/AxiLiteBus), instead of poking
+# <name>_core's plain ports directly.
+cocotbext-axi
 
 # ── Register generation ───────────────────────────────────────────────────────
 hdl-registers>=8.0
