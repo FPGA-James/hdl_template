@@ -147,7 +147,11 @@ docs/            Sphinx documentation source (RST shells + conf.py)
 
 The `tb/cocotb/Makefile` enforces valid combinations with an error guard.
 
-`make sim-native TOPLEVEL_HDL=vhdl|sv` is a separate, framework-less path — it compiles and runs `tb/native/vhdl/NAME_tb.vhd` directly with NVC, or `tb/native/sv/NAME_tb.sv` directly with `verilator --binary --timing`, with no VUnit/cocotb dependency. Both testbenches target `<<NAME>>_core` directly (not `_top`), matching the VUnit and cocotb testbenches, so the AXI-Lite register block and `hdl-modules` are not involved.
+Every testbench above targets `<<NAME>>_top` (not `_core`), driving it over its real AXI-Lite register interface: VUnit uses `hdl_registers`' generated read/write package plus `hdl-modules`' `axi_lite_master` BFM; cocotb (both languages) uses `cocotbext-axi`'s `AxiLiteMaster`.
+
+`make sim-native TOPLEVEL_HDL=vhdl|sv` is a separate, framework-less path — it compiles and runs `tb/native/vhdl/NAME_tb.vhd` directly with NVC (using OSVVM's `Axi4LiteManager` — install once via `nvc --install osvvm`), or `tb/native/sv/NAME_tb.sv` directly with `verilator --binary --timing` (using a small hand-rolled AXI-Lite driver, `tb/native/sv/axi_lite_driver_pkg.sv` — no off-the-shelf, non-UVM, Verilator-compatible SV BFM exists). Both also target `<<NAME>>_top`.
+
+`make sim-cpp TOPLEVEL_HDL=sv` compiles and runs `tb/cpp/<<NAME>>_tb.cpp` via `verilator --cc --exe --build`, using a small hand-rolled AXI-Lite driver (`tb/cpp/axi_lite_driver.hpp`) — the conventional way to write a Verilator C++ harness for a bus this simple. SV-only; Verilator doesn't read VHDL.
 
 ### Register Generation
 

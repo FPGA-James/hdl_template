@@ -120,6 +120,7 @@ make deps            Fetch external HDL repos via Bender (bender update)
 make regs            Generate register files from regs/*.toml → out/regs/
 make sim             Run testbench (see FRAMEWORK/SIM/TOPLEVEL_HDL vars)
 make sim-native      Run the framework-less testbench directly with NVC/Verilator [TOPLEVEL_HDL=vhdl|sv]
+make sim-cpp         Run the C++ testbench directly with Verilator --cc --exe --build [TOPLEVEL_HDL=sv only]
 make lint            VHDL: GHDL analysis + vsg  |  SV: Verilator --lint-only
 make lint-vhdl       VHDL lint only
 make lint-sv         SV lint only
@@ -268,7 +269,7 @@ The `docs.yml` workflow builds Sphinx HTML and deploys to GitHub Pages on every 
 | Verilator | SV sim + lint | `apt install verilator` / `brew install verilator` |
 | Icarus Verilog | SV sim (icarus path) | `apt install iverilog` / `brew install icarus-verilog` |
 | Yosys | Synthesis | `apt install yosys` / [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build/releases) |
-| [NVC](https://www.nickg.me.uk/nvc/) | `make sim-native TOPLEVEL_HDL=vhdl` | `brew install nvc` / [releases](https://github.com/nickg/nvc/releases) — not part of OSS CAD Suite |
+| [NVC](https://www.nickg.me.uk/nvc/) | `make sim-native TOPLEVEL_HDL=vhdl` | `brew install nvc` / [releases](https://github.com/nickg/nvc/releases) — not part of OSS CAD Suite; also run `nvc --install osvvm` once, needed by the native VHDL testbench |
 | Graphviz | Documentation diagrams | `apt install graphviz` / `brew install graphviz` |
 | Bender | Dependency management | [releases](https://github.com/pulp-platform/bender/releases) |
 | VHDL LS (`hbohlin.vhdl-ls`) | VHDL editor intelligence | VS Code extension |
