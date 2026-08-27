@@ -74,7 +74,7 @@ VHDL_REG_FILE    = $(HDL_MODULES)/modules/register_file/src/register_file_pkg.vh
 # Phony targets
 # =============================================================================
 .PHONY: all venv install init deps lsp vhdl-ls verible-ls filelist regs \
-        sim sim-vunit sim-vunit-gui sim-cocotb sim-native sim-native-vhdl sim-native-sv \
+        sim sim-vunit sim-vunit-gui sim-cocotb sim-native sim-native-vhdl sim-native-sv sim-cpp \
         synth synth-gui impl impl-gui icestudio \
         hierarchy scaffold extract coverage reports html pdf doc \
         lint lint-vhdl lint-sv \
@@ -270,6 +270,23 @@ sim-native-sv: regs ## Compile+run tb/native/sv/<<NAME>>_tb.sv directly with Ver
 	  tb/native/sv/<<NAME>>_tb.sv
 	@$(NATIVE_RDIR)/verilator_obj/V<<NAME>>_tb
 	@printf "\n\033[32m  ✓\033[0m Native SystemVerilog simulation passed\n\n"
+
+sim-cpp: regs ## Compile+run tb/cpp/<<NAME>>_tb.cpp directly with Verilator --cc --exe --build (SV only)
+ifneq ($(TOPLEVEL_HDL),sv)
+	$(error sim-cpp requires TOPLEVEL_HDL=sv -- Verilator does not read VHDL)
+endif
+	@printf "\n\033[1m  Running C++ testbench (Verilator --cc --exe --build)...\033[0m\n\n"
+	@mkdir -p $(NATIVE_RDIR)/cpp_obj
+	@$(OSS_CAD_SUITE)/bin/verilator --cc --exe --build -Wall -Wno-fatal -j 0 \
+	  -Mdir $(NATIVE_RDIR)/cpp_obj --top-module <<NAME>>_top \
+	  src/sv/<<NAME>>_pkg.sv \
+	  $(SV_GEN) \
+	  src/sv/<<NAME>>_core.sv src/sv/<<NAME>>_top.sv \
+	  tb/cpp/<<NAME>>_tb.cpp \
+	  -CFLAGS "-I$(CURDIR)/tb/cpp -I$(CURDIR)/out/regs/c" \
+	  -o <<NAME>>_tb_cpp
+	@$(NATIVE_RDIR)/cpp_obj/<<NAME>>_tb_cpp
+	@printf "\n\033[32m  ✓\033[0m C++ testbench passed\n\n"
 
 # =============================================================================
 # Synthesis
