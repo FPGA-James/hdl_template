@@ -263,7 +263,11 @@ sim-native-sv: regs ## Compile+run tb/native/sv/<<NAME>>_tb.sv directly with Ver
 	@mkdir -p $(NATIVE_RDIR)/verilator_obj
 	@$(OSS_CAD_SUITE)/bin/verilator --binary --timing -Wall -Wno-fatal -j 0 \
 	  -Mdir $(NATIVE_RDIR)/verilator_obj --top-module <<NAME>>_tb \
-	  src/sv/<<NAME>>_pkg.sv src/sv/<<NAME>>_core.sv tb/native/sv/<<NAME>>_tb.sv
+	  tb/native/sv/axi_lite_driver_pkg.sv \
+	  src/sv/<<NAME>>_pkg.sv \
+	  $(SV_GEN) \
+	  src/sv/<<NAME>>_core.sv src/sv/<<NAME>>_top.sv \
+	  tb/native/sv/<<NAME>>_tb.sv
 	@$(NATIVE_RDIR)/verilator_obj/V<<NAME>>_tb
 	@printf "\n\033[32m  ✓\033[0m Native SystemVerilog simulation passed\n\n"
 
