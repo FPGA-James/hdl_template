@@ -18,9 +18,9 @@ bus transactions (via cocotbext-axi's AxiLiteMaster), not single-cycle
 register peeks. If the counter is enabled and actively counting *during* a
 transaction, it keeps counting for the transaction's whole duration, so a
 naive "assert pulse_count == N" after N RisingEdge waits does not hold once
-a bus read/write is involved. This was measured empirically (see
-task-5-report.md): with this project's generated register file (a
-single-cycle-ready AXI-Lite slave), and cocotbext-axi's default AxiLiteMaster
+a bus read/write is involved. This was measured empirically: with this
+project's generated register file (a single-cycle-ready AXI-Lite slave),
+and cocotbext-axi's default AxiLiteMaster
 (no injected backpressure), two consecutive read_status() calls separated by
 W pure RisingEdge waits always satisfy:
     count_after - count_before == (W + READ_TO_READ_OVERHEAD_CYCLES) * step

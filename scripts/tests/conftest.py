@@ -92,3 +92,38 @@ def demo_register_list(demo_toml_file):
     from hdl_registers.parser.toml import from_toml
 
     return from_toml(name="demo", toml_file=demo_toml_file)
+
+
+@pytest.fixture
+def demo_toml_file_with_array(tmp_path: Path) -> Path:
+    content = """\
+[conf]
+mode = "r_w"
+[conf.enable]
+type = "bit"
+default_value = "0"
+
+[chan]
+type = "register_array"
+array_length = 4
+[chan.control]
+mode = "r_w"
+[chan.control.value]
+type = "bit"
+
+[status]
+mode = "r"
+[status.pulse_count]
+type = "bit_vector"
+width = 16
+"""
+    path = tmp_path / "demo_regs.toml"
+    path.write_text(content)
+    return path
+
+
+@pytest.fixture
+def demo_register_list_with_array(demo_toml_file_with_array):
+    from hdl_registers.parser.toml import from_toml
+
+    return from_toml(name="demo", toml_file=demo_toml_file_with_array)

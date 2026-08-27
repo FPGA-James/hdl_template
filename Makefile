@@ -220,16 +220,16 @@ endif
 sim-vunit: regs ## Run VUnit testbench via GHDL (VHDL only)
 	$(call check-venv)
 	@printf "\n\033[1m  Running VUnit simulation (GHDL)...\033[0m\n\n"
-	@VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py $(VUNIT_ARGS)
+	@BENDER=$(BENDER) VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py $(VUNIT_ARGS)
 
 sim-vunit-gui: regs ## Open VUnit testbench in the GHDL waveform viewer
 	$(call check-venv)
-	@VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py --gui $(VUNIT_ARGS)
+	@BENDER=$(BENDER) VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py --gui $(VUNIT_ARGS)
 
 sim-cocotb: regs ## Run cocotb testbench  [SIM=  TOPLEVEL_HDL=vhdl|sv]
 	@mkdir -p waves
 	@printf "\n\033[1m  Running cocotb simulation ($(SIM))...\033[0m\n\n"
-	@$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL)
+	@$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL) BENDER=$(BENDER)
 
 NATIVE_RDIR = out/native
 

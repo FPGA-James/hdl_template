@@ -46,11 +46,11 @@
 //    first observes bvalid/rvalid, no resp_seen deferral) was built and
 //    run against the real generated register file and hung indefinitely
 //    every time (confirmed via `ps` showing the compiled testbench
-//    pegged at 100% CPU with zero progress, not a slow pass) -- see
-//    task-9-report.md for the transcript. So the DUT-side registered
-//    FIFO-pointer requirement applies regardless of simulator scheduling
-//    model, as expected for a synchronous-design property, and the
-//    one-cycle hold below is required, not just precautionary.
+//    pegged at 100% CPU with zero progress, not a slow pass). So the
+//    DUT-side registered FIFO-pointer requirement applies regardless of
+//    simulator scheduling model, as expected for a synchronous-design
+//    property, and the one-cycle hold below is required, not just
+//    precautionary.
 //    Read data is still captured in the same branch that observes
 //    rvalid, not deferred: rdata is only guaranteed valid while rvalid is
 //    asserted and can go stale once the accept pointer advances, so only

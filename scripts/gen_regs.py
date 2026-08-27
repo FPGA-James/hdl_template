@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from hdl_registers.parser.toml import from_toml
+from hdl_registers.register_array import RegisterArray
 from hdl_registers.generator.vhdl.register_package import VhdlRegisterPackageGenerator
 from hdl_registers.generator.vhdl.record_package import VhdlRecordPackageGenerator
 from hdl_registers.generator.vhdl.axi_lite.wrapper import VhdlAxiLiteWrapperGenerator
@@ -373,11 +374,21 @@ def _make_sv_synthesizable(text: str) -> str:
 
 
 def render_sv_address_constants(register_list) -> str:
-    """Generate a small SV package with one localparam per register's byte
-    address (4 * 0-based index into the register list) -- the same
-    computation the VHDL path's generated read/write package uses
-    internally. Verified: generated for this project's real register map,
-    compiled and ran cleanly under both Verilator and Icarus.
+    """Generate a small SV package with one localparam per plain register's
+    byte address (4 * the register's real index within the register list)
+    -- the same computation the VHDL path's generated read/write package
+    uses internally. Verified: generated for this project's real register
+    map, compiled and ran cleanly under both Verilator and Icarus.
+
+    Uses each register's own `.index` attribute, not its position in
+    `register_objects` (via `enumerate()`): a `RegisterArray` earlier in
+    the list consumes multiple indices (one per array element) but is a
+    single entry in `register_objects`, so positional enumeration silently
+    produces wrong addresses for every plain register that follows one.
+    `RegisterArray` entries themselves are skipped -- they have no single
+    address of their own, and this template's register auto-wiring
+    doesn't support arrays anyway (each field must resolve to one
+    <name>_core port).
 
     Names are deliberately lowercase (demo_conf_addr, not DEMO_CONF_ADDR):
     <<NAME>> template substitution is a literal, case-preserving text
@@ -388,9 +399,11 @@ def render_sv_address_constants(register_list) -> str:
     """
     name = register_list.name
     lines = [f"package {name}_regs_addr_pkg;"]
-    for index, register in enumerate(register_list.register_objects):
+    for register in register_list.register_objects:
+        if isinstance(register, RegisterArray):
+            continue
         const_name = f"{name}_{register.name}_addr"
-        lines.append(f"    localparam int unsigned {const_name} = 4 * {index};")
+        lines.append(f"    localparam int unsigned {const_name} = 4 * {register.index};")
     lines.append("endpackage")
     return "\n".join(lines) + "\n"
 

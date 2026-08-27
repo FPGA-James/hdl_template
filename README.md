@@ -105,7 +105,7 @@ The template ships with a saturating pulse counter as the example design. Three-
   └── <name>_core  ← pure logic, register signals in/out
 ```
 
-Both VHDL (`src/vhdl/`) and SystemVerilog (`src/sv/`) implementations have identical port names, so the cocotb testbench (`tb/cocotb/test_<name>.py`) runs unchanged against either.
+Both VHDL (`src/vhdl/`) and SystemVerilog (`src/sv/`) implementations have identical port names, so the cocotb testbench (`tb/cocotb/test_<name>.py`) runs unchanged against either — the VHDL path targets a thin flattening wrapper (`tb/cocotb/vhdl/<name>_cocotb_top.vhd`) around an unmodified `<name>_top`, since GHDL's VPI backend can't expose VHDL record-typed ports to cocotb directly; the test file itself needs no per-language changes.
 
 > **After `make init`**, the chosen language's files are moved to a flat `src/` with no subdirectory. The unused language folder is deleted.
 

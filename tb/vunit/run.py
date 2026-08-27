@@ -11,12 +11,19 @@ Or directly:
     VUNIT_SIMULATOR=ghdl python tb/vunit/run.py -g               # GUI mode
 """
 
+import os
 import subprocess
 from pathlib import Path
 from vunit import VUnit
 
 # Repository root (two levels up from this file: tb/vunit/run.py → repo root)
 ROOT = Path(__file__).resolve().parents[2]
+
+# Matches the Makefile's BENDER ?= bender override (documented there as
+# "must be on PATH or set here") -- read from the environment so
+# `make sim FRAMEWORK=vunit BENDER=/opt/bender` actually takes effect here
+# too, not just for the Makefile's own direct bender invocations.
+BENDER = os.environ.get("BENDER", "bender")
 
 vu = VUnit.from_argv()
 vu.add_vhdl_builtins()
@@ -29,7 +36,7 @@ vu.add_verification_components()
 # axi_lite_master BFM that drives <<NAME>>_top's AXI-Lite port) ─────────────
 HDL_MODULES = Path(
     subprocess.run(
-        ["bender", "path", "hdl_modules"],
+        [BENDER, "path", "hdl_modules"],
         cwd=ROOT,
         capture_output=True,
         text=True,

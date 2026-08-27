@@ -112,11 +112,14 @@ src/sv/          SystemVerilog RTL (same structure, identical port names)
 regs/            TOML register definitions (source of truth)
 out/             GENERATED outputs (gitignored)
   out/regs/vhdl/ VHDL register packages + AXI-Lite wrapper
+  out/regs/sv/   SV register file + address-constants package (SV projects only)
   out/regs/c/    C header files
   out/regs/html/ HTML register documentation
 tb/vunit/        VUnit runner (run.py) + VHDL testbenches
 tb/cocotb/       cocotb Makefile + Python test modules
+  tb/cocotb/vhdl/  GHDL-only flattening wrapper (see Simulator / Framework Routing above)
 tb/native/       Framework-less testbenches (tb/native/vhdl, tb/native/sv) run directly by NVC / Verilator
+tb/cpp/          Framework-less C++ testbench + hand-rolled AXI-Lite driver, run directly by Verilator --cc --exe --build
 synth/           Yosys synthesis scripts (.ys) + XDC constraints
 scripts/
   hdl_autodoc/   HDL AutoDoc extraction pipeline (unchanged from HDLAutoDoc)
@@ -143,11 +146,20 @@ docs/            Sphinx documentation source (RST shells + conf.py)
 | `FRAMEWORK` | `SIM`      | `TOPLEVEL_HDL` | Mechanism             |
 |-------------|------------|----------------|-----------------------|
 | `vunit`     | ghdl       | vhdl           | VUnit → GHDL via VHPI |
-| `cocotb`    | ghdl       | vhdl           | cocotb → GHDL via VHPI|
+| `cocotb`    | ghdl       | vhdl           | cocotb → GHDL via VPI |
 | `cocotb`    | verilator  | sv             | cocotb → Verilator VPI|
 | `cocotb`    | icarus     | sv             | cocotb → iverilog VPI |
 
 The `tb/cocotb/Makefile` enforces valid combinations with an error guard.
+
+The `cocotb`/`ghdl`/`vhdl` row targets a thin wrapper entity,
+`tb/cocotb/vhdl/<<NAME>>_cocotb_top.vhd`, not `<<NAME>>_top` directly:
+GHDL's VPI backend cannot expose VHDL record-typed ports (used by
+`<<NAME>>_top`'s AXI-Lite `s_axi_m2s`/`s_axi_s2m` ports) to cocotb at
+all, so the wrapper flattens them into flat signals (matching the SV
+side's native naming) around an unmodified `<<NAME>>_top` instance.
+`<<NAME>>_top.vhd` itself is untouched; the SV path needs no such
+wrapper since its ports are already flat.
 
 Every testbench above targets `<<NAME>>_top` (not `_core`), driving it over its real AXI-Lite register interface: VUnit uses `hdl_registers`' generated read/write package plus `hdl-modules`' `axi_lite_master` BFM; cocotb (both languages) uses `cocotbext-axi`'s `AxiLiteMaster`.
 
@@ -161,12 +173,13 @@ Register definitions live in `regs/<name>_regs.toml` using the `hdl_registers` T
 - `out/regs/vhdl/<name>_regs_pkg.vhd` — address/field constants
 - `out/regs/vhdl/<name>_register_record_pkg.vhd` — typed VHDL records
 - `out/regs/vhdl/<name>_register_file_axi_lite.vhd` — AXI-Lite register entity (this is `<<NAME>>_regs`)
+- `out/regs/vhdl/<name>_register_read_write_pkg.vhd` — VUnit-only simulation read/write procedures, used by `tb/vunit/vhdl/<name>_tb.vhd` to drive registers over `net`/`bus_handle` message passing instead of raw signal manipulation
 - `out/regs/c/<name>_regs.h` — C header for embedded drivers
 - `out/regs/html/<name>_regs.html` — register documentation
 
 The generated AXI-Lite entity requires the `hdl-modules` library (fetched via `make deps`).
 
-For SystemVerilog projects, `make regs` instead generates `out/regs/sv/<name>_register_file_axi_lite.sv` and `out/regs/sv/<name>_register_file_axi_lite_pkg.sv` via PeakRDL-regblock (through `hdl_registers`' SystemVerilog generator, `flatten_axi_lite=True`).
+For SystemVerilog projects, `make regs` instead generates `out/regs/sv/<name>_register_file_axi_lite.sv` and `out/regs/sv/<name>_register_file_axi_lite_pkg.sv` via PeakRDL-regblock (through `hdl_registers`' SystemVerilog generator, `flatten_axi_lite=True`), plus `out/regs/sv/<name>_regs_addr_pkg.sv` — a small lowercase-named localparam package (one per register's byte address) consumed by `tb/native/sv/<name>_tb.sv`, since `<<NAME>>` template substitution can't produce the C header's uppercase macro names pre-init.
 
 `make regs` also auto-wires each register field to a matching `<name>_core` port, rewriting only the marker-delimited region(s) inside `<name>_top` (VHDL: `-- BEGIN/END AUTOGEN REGISTER SIGNALS` plus `-- BEGIN/END AUTOGEN REGISTERS`; SV: `// BEGIN/END AUTOGEN REGISTERS`). Field leaf names must be unique across the whole register map (each resolves to a distinct `<name>_core` port) — see the "SV register-file synthesizability" note above for the residual Icarus gap this introduces.
 

@@ -359,3 +359,19 @@ def test_render_sv_address_constants_wraps_in_named_package(demo_register_list):
     text = gen_regs.render_sv_address_constants(demo_register_list)
     assert text.startswith("package demo_regs_addr_pkg;")
     assert text.strip().endswith("endpackage")
+
+
+def test_render_sv_address_constants_uses_real_index_across_a_register_array(
+    demo_register_list_with_array,
+):
+    # A RegisterArray consumes multiple indices (one per array element) but
+    # is a single entry in register_objects -- positional enumerate() would
+    # give "status" index 1 (wrong; the real index is 5, since "chan" has
+    # array_length=4) and would also emit a meaningless address for "chan"
+    # itself. Regression test for the bug this caught: an earlier version
+    # used enumerate() and silently produced wrong addresses for every
+    # register following an array.
+    text = gen_regs.render_sv_address_constants(demo_register_list_with_array)
+    assert "localparam int unsigned demo_conf_addr = 4 * 0;" in text
+    assert "localparam int unsigned demo_status_addr = 4 * 5;" in text
+    assert "chan" not in text
