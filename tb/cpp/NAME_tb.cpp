@@ -154,6 +154,7 @@ int main(int argc, char** argv) {
     }
 
     printf("PASS: all C++ tests completed\n");
+    top->final();
     delete top;
     return 0;
 }
