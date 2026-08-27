@@ -257,5 +257,8 @@ jobs:
           curl -sSL -o nvc.deb https://github.com/nickg/nvc/releases/download/r1.22.1/nvc_1.22.1-1_amd64_ubuntu-24.04.deb
           sudo apt-get install -y ./nvc.deb
 
+      - name: Install OSVVM
+        run: nvc --install osvvm
+
       - name: Run smoke test
         run: bash scripts/smoke_test.sh ${{ matrix.lang }}
