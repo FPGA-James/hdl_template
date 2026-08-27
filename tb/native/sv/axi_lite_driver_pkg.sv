@@ -7,6 +7,11 @@
 // this project's test scenarios need, nothing more. A real BFM can
 // replace this later without touching the testbench that calls it, as
 // long as the axil_write/axil_read task signatures stay the same.
+// Callers must not issue a second call on the same channel (write or
+// read) before the first one returns: the ready-hold-one-extra-cycle
+// behavior below assumes a single outstanding transaction per channel,
+// and could in principle accept an unintended second response that
+// becomes valid during that extra held cycle if calls were pipelined.
 //
 // Both tasks poll all of their channel's handshake signals in a single
 // per-cycle loop rather than one dedicated wait per signal. A slave whose
