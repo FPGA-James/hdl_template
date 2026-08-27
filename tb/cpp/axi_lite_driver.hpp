@@ -58,6 +58,8 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 
 // Template on the Verilated top-level type so this driver has zero
@@ -65,6 +67,13 @@
 template <typename Top>
 class AxiLiteDriver {
 public:
+    // A stuck handshake (a real regression, not expected in normal use)
+    // would otherwise spin write()/read()'s polling loop forever with no
+    // output, unlike the SV/VHDL native testbenches' explicit watchdog
+    // processes -- this cap makes that failure mode exit with a clear
+    // message instead of hanging the calling `make sim-cpp` indefinitely.
+    static constexpr int kMaxWaitCycles = 1000;
+
     explicit AxiLiteDriver(Top* top) : top_(top) {}
 
     void write(uint8_t addr, uint32_t data) {
@@ -72,7 +81,11 @@ public:
         top_->s_axi_awvalid = 1; top_->s_axi_awaddr = addr;
         top_->s_axi_wvalid  = 1; top_->s_axi_wdata  = data; top_->s_axi_wstrb = 0xF;
         top_->s_axi_bready  = 1;
-        for (;;) {
+        for (int cycles = 0; ; cycles++) {
+            if (cycles >= kMaxWaitCycles) {
+                fprintf(stderr, "FAIL: axil_write watchdog -- no response after %d cycles\n", kMaxWaitCycles);
+                exit(1);
+            }
             tick();
             if (!aw_done && top_->s_axi_awready) { top_->s_axi_awvalid = 0; aw_done = true; }
             if (!w_done && top_->s_axi_wready)   { top_->s_axi_wvalid  = 0; w_done  = true; }
@@ -86,7 +99,11 @@ public:
         uint32_t data = 0;
         top_->s_axi_arvalid = 1; top_->s_axi_araddr = addr;
         top_->s_axi_rready  = 1;
-        for (;;) {
+        for (int cycles = 0; ; cycles++) {
+            if (cycles >= kMaxWaitCycles) {
+                fprintf(stderr, "FAIL: axil_read watchdog -- no response after %d cycles\n", kMaxWaitCycles);
+                exit(1);
+            }
             tick();
             if (!ar_done && top_->s_axi_arready) { top_->s_axi_arvalid = 0; ar_done = true; }
             if (resp_seen) { top_->s_axi_rready = 0; break; }
