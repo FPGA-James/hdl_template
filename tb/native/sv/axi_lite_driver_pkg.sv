@@ -25,6 +25,22 @@
 // stale value the same cycle the task wrote it), so blocking assignment
 // is required here for the write to be visible to the DUT on the correct
 // edge.
+//
+// bready/rready are held one extra cycle past first observing bvalid/
+// rvalid before being cleared, rather than cleared the same edge. This
+// project's generated register file (PeakRDL-regblock) tracks response
+// acceptance with a registered FIFO pointer that needs bvalid/bready (or
+// rvalid/rready) to have been stable for a full clock cycle to correctly
+// register an accept; clearing ready the same instant valid is first
+// observed can leave that pointer permanently stuck (verified via direct
+// hierarchical inspection of the generated file's response-FIFO state:
+// the accept pointer never advanced, deadlocking every later transaction
+// on that channel) -- this did not surface against the toy always-ready
+// slave used above, which has no such backpressure-aware bookkeeping.
+// For reads specifically, rdata must still be captured on the SAME cycle
+// rvalid is first observed (rdata is only guaranteed valid while rvalid
+// is asserted, and can go stale the instant rvalid drops once the FIFO
+// pointer advances) -- only the rready clear is deferred, not the read.
 package axi_lite_driver_pkg;
 
     task automatic axil_write(
@@ -35,7 +51,7 @@ package axi_lite_driver_pkg;
         input logic [7:0]  addr,
         input logic [31:0] data
     );
-        bit aw_done = 1'b0, w_done = 1'b0;
+        bit aw_done = 1'b0, w_done = 1'b0, resp_seen = 1'b0;
         awvalid = 1'b1; awaddr = addr;
         wvalid  = 1'b1; wdata  = data; wstrb = 4'b1111;
         bready  = 1'b1;
@@ -43,7 +59,8 @@ package axi_lite_driver_pkg;
             @(posedge clk);
             if (!aw_done && awready) begin awvalid = 1'b0; aw_done = 1'b1; end
             if (!w_done && wready)   begin wvalid  = 1'b0; w_done  = 1'b1; end
-            if (bvalid) begin bready = 1'b0; break; end
+            if (resp_seen) begin bready = 1'b0; break; end
+            if (bvalid) resp_seen = 1'b1;
         end
     endtask
 
@@ -54,13 +71,14 @@ package axi_lite_driver_pkg;
         input logic [7:0]  addr,
         output logic [31:0] data
     );
-        bit ar_done = 1'b0;
+        bit ar_done = 1'b0, resp_seen = 1'b0;
         arvalid = 1'b1; araddr = addr;
         rready  = 1'b1;
         forever begin
             @(posedge clk);
             if (!ar_done && arready) begin arvalid = 1'b0; ar_done = 1'b1; end
-            if (rvalid) begin data = rdata; rready = 1'b0; break; end
+            if (resp_seen) begin rready = 1'b0; break; end
+            if (rvalid) begin data = rdata; resp_seen = 1'b1; end
         end
     endtask
 
