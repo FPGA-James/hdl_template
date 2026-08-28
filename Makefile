@@ -18,8 +18,14 @@ OSS_CAD_SUITE ?= $(HOME)/tools/oss-cad-suite
 # Mirror what `source environment` does: extend PATH and set tool prefixes.
 # .venv/bin goes first so cocotb's own sub-Makefiles can find cocotb-config
 # via bare PATH lookup (tb/cocotb/Makefile shells out to it directly) --
-# $(PYTHON) alone only covers explicit python invocations, not this.
-export PATH         := .venv/bin:$(OSS_CAD_SUITE)/bin:$(OSS_CAD_SUITE)/py3bin:$(PATH)
+# $(PYTHON) alone only covers explicit python invocations, not this. Must be
+# $(CURDIR)-absolute, not a bare relative "./.venv/bin": tb/cocotb/Makefile
+# runs via `$(MAKE) -C tb/cocotb`, which changes the shell's cwd, so a
+# relative entry silently resolves to nothing there and PATH search falls
+# through to OSS CAD Suite's own bundled cocotb-config -- which brings its
+# own bundled cocotb (matched to its own bundled Python/VPI libs) instead of
+# the pinned one this project's requirements.txt installs into .venv.
+export PATH         := $(CURDIR)/.venv/bin:$(OSS_CAD_SUITE)/bin:$(OSS_CAD_SUITE)/py3bin:$(PATH)
 export GHDL_PREFIX  ?= $(OSS_CAD_SUITE)/lib/ghdl
 export VERILATOR_ROOT ?= $(OSS_CAD_SUITE)/share/verilator
 
