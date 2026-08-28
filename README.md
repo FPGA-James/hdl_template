@@ -245,16 +245,10 @@ GitHub Actions runs on every push and pull request:
 | Job | Tools |
 |---|---|
 | `regs` | hdl-registers + drift check (regenerate + diff) |
-| `lint` | GHDL + vsg (VHDL), Verilator (SV) |
-| `sim-vhdl-vunit` | GHDL + VUnit |
-| `sim-vhdl-cocotb` | GHDL + cocotb |
-| `sim-sv-verilator` | Verilator + cocotb |
-| `sim-sv-icarus` | Icarus Verilog + cocotb |
-| `synth` | Yosys XC7 |
 | `test-autodoc` | pytest (HDLAutoDoc test suite) |
-| `smoke-test` (vhdl, sv matrix) | `scripts/smoke_test.sh` — the only job that runs `make init` first, then `regs`/`lsp`/every testbench flow/`lint`/`synth`/`html`/`coverage` against the initialised project |
+| `smoke-test` (vhdl, sv matrix) | `scripts/smoke_test.sh` — runs `make init` first, then `regs`/`lsp`/every testbench flow/`lint`/`synth`/`html`/`coverage` against the initialised project. This is the job that actually reflects what a real user of this template builds against. |
 
-**Known gap:** every job above `smoke-test` runs directly against this repo's un-initialised checkout, where RTL/register-file paths still contain the literal `<<NAME>>` placeholder — `Bender.yml`'s own source lists use that same placeholder, so they only resolve to real files after `make init` has run. `lint`, `sim-vhdl-*`, `sim-sv-*`, and `synth` accordingly don't yet exercise real files pre-init. `smoke-test` is the reliable signal today; treat the others as informational until this is addressed.
+**Six jobs are commented out in `.github/workflows/ci.yml`** (`lint`, `sim-vhdl-vunit`, `sim-vhdl-cocotb`, `sim-sv-verilator`, `sim-sv-icarus`, `synth`): they ran directly against this repo's un-initialised checkout, where RTL/register-file paths still contain the literal `<<NAME>>` placeholder — `Bender.yml`'s own source lists use that same placeholder, so they never resolved to real files and could not pass by design, not due to a bug. They're left in the workflow file as comments (not deleted) in case they're ever reworked to run against a `make init`'d scratch copy instead, mirroring `smoke-test`'s own approach — at which point they'd stop being redundant with it. Until then, `smoke-test` is the only job worth watching; don't re-enable the others without addressing the `<<NAME>>` gap first, or every push will red them out again.
 
 The `docs.yml` workflow builds Sphinx HTML and deploys to GitHub Pages on every push to `main`. Enable it under **Settings → Pages → Source: GitHub Actions**.
 

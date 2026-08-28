@@ -30,228 +30,240 @@ jobs:
           diff -rq out_regs_orig/ out/regs/ \
             || (echo "ERROR: Regenerated files differ — register generation is non-deterministic or make regs was run against a stale checkout." && exit 1)
 
-  # ── VHDL lint (GHDL analysis + vsg) ─────────────────────────────────────────
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    needs: regs
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install Python dependencies
-        run: make venv
-
-      - name: Cache OSS CAD Suite
-        id: cache-oss-cad-suite
-        uses: actions/cache@v4
-        with:
-          path: ~/tools/oss-cad-suite
-          key: oss-cad-suite-linux-x64-2026-08-27
-
-      - name: Install OSS CAD Suite
-        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/tools
-          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
-            | tar -xz -C ~/tools
-
-      - name: Install Bender
-        run: |
-          curl -sSL https://github.com/pulp-platform/bender/releases/latest/download/bender-x86_64-unknown-linux-gnu.tar.xz \
-            | tar -xJ -C /tmp
-          mv /tmp/bender-x86_64-unknown-linux-gnu/bender /usr/local/bin/bender
-
-      - name: Generate register files
-        run: make regs
-
-      - name: VHDL lint (GHDL + vsg)
-        run: make lint-vhdl
-
-      - name: SV lint (Verilator)
-        run: make lint-sv
-
-  # ── VHDL simulation — VUnit + GHDL ───────────────────────────────────────────
-  sim-vhdl-vunit:
-    name: "VHDL / GHDL / VUnit"
-    runs-on: ubuntu-latest
-    needs: regs
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install Python dependencies
-        run: make venv
-
-      - name: Cache OSS CAD Suite
-        id: cache-oss-cad-suite
-        uses: actions/cache@v4
-        with:
-          path: ~/tools/oss-cad-suite
-          key: oss-cad-suite-linux-x64-2026-08-27
-
-      - name: Install OSS CAD Suite
-        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/tools
-          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
-            | tar -xz -C ~/tools
-
-      - name: Generate register files
-        run: make regs
-
-      - name: Run VUnit testbench
-        run: make sim FRAMEWORK=vunit
-
-      - name: Upload VUnit results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: vunit-results
-          path: vunit_out/
-
-  # ── VHDL simulation — cocotb + GHDL ──────────────────────────────────────────
-  sim-vhdl-cocotb:
-    name: "VHDL / GHDL / cocotb"
-    runs-on: ubuntu-latest
-    needs: regs
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install Python dependencies
-        run: make venv
-
-      - name: Cache OSS CAD Suite
-        id: cache-oss-cad-suite
-        uses: actions/cache@v4
-        with:
-          path: ~/tools/oss-cad-suite
-          key: oss-cad-suite-linux-x64-2026-08-27
-
-      - name: Install OSS CAD Suite
-        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/tools
-          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
-            | tar -xz -C ~/tools
-
-      - name: Generate register files
-        run: make regs
-
-      - name: Run cocotb testbench (GHDL)
-        run: make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl
-
-  # ── SV simulation — cocotb + Verilator ───────────────────────────────────────
-  sim-sv-verilator:
-    name: "SV / Verilator / cocotb"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install Python dependencies
-        run: make venv
-
-      - name: Cache OSS CAD Suite
-        id: cache-oss-cad-suite
-        uses: actions/cache@v4
-        with:
-          path: ~/tools/oss-cad-suite
-          key: oss-cad-suite-linux-x64-2026-08-27
-
-      - name: Install OSS CAD Suite
-        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/tools
-          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
-            | tar -xz -C ~/tools
-
-      - name: Run cocotb testbench (Verilator)
-        run: make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv
-
-  # ── SV simulation — cocotb + Icarus Verilog ───────────────────────────────────
-  sim-sv-icarus:
-    name: "SV / Icarus / cocotb"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install Python dependencies
-        run: make venv
-
-      - name: Cache OSS CAD Suite
-        id: cache-oss-cad-suite
-        uses: actions/cache@v4
-        with:
-          path: ~/tools/oss-cad-suite
-          key: oss-cad-suite-linux-x64-2026-08-27
-
-      - name: Install OSS CAD Suite
-        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/tools
-          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
-            | tar -xz -C ~/tools
-
-      - name: Run cocotb testbench (Icarus)
-        run: make sim FRAMEWORK=cocotb SIM=icarus TOPLEVEL_HDL=sv
-
-  # ── Yosys synthesis ───────────────────────────────────────────────────────────
-  synth:
-    name: "Synthesis (Yosys XC7)"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install Python dependencies
-        run: make venv
-
-      - name: Cache OSS CAD Suite
-        id: cache-oss-cad-suite
-        uses: actions/cache@v4
-        with:
-          path: ~/tools/oss-cad-suite
-          key: oss-cad-suite-linux-x64-2026-08-27
-
-      - name: Install OSS CAD Suite
-        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/tools
-          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
-            | tar -xz -C ~/tools
-
-      - name: Generate register files
-        run: make regs
-
-      - name: Synthesise SV (native Yosys path)
-        run: make synth TOPLEVEL_HDL=sv
-
-      - name: Upload synthesis output
-        uses: actions/upload-artifact@v4
-        with:
-          name: synthesis-output
-          path: synth/output/
+  # ── Disabled: lint / sim-vhdl-vunit / sim-vhdl-cocotb / sim-sv-verilator /
+  # sim-sv-icarus / synth all run against the raw, un-initialised checkout
+  # (<<NAME>> never replaced by `make init`) — Bender.yml's own <<NAME>>
+  # placeholder source lists never resolve to real files there, so these
+  # jobs cannot pass by design, not due to a bug. This predates any recent
+  # work (see git history) and is why `smoke-test` below exists: it runs
+  # `make init` first and is the only job here that exercises real files,
+  # matching what real users of this template actually build against.
+  # Left commented rather than deleted in case these are ever reworked to
+  # run post-init (e.g. against a `make init`'d scratch copy, mirroring
+  # smoke-test's own approach) instead of being redundant with it.
+  #
+  # # ── VHDL lint (GHDL analysis + vsg) ─────────────────────────────────────────
+  # lint:
+  #   name: Lint
+  #   runs-on: ubuntu-latest
+  #   needs: regs
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.13"
+  #
+  #     - name: Install Python dependencies
+  #       run: make venv
+  #
+  #     - name: Cache OSS CAD Suite
+  #       id: cache-oss-cad-suite
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/tools/oss-cad-suite
+  #         key: oss-cad-suite-linux-x64-2026-08-27
+  #
+  #     - name: Install OSS CAD Suite
+  #       if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+  #       run: |
+  #         mkdir -p ~/tools
+  #         curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+  #           | tar -xz -C ~/tools
+  #
+  #     - name: Install Bender
+  #       run: |
+  #         curl -sSL https://github.com/pulp-platform/bender/releases/latest/download/bender-x86_64-unknown-linux-gnu.tar.xz \
+  #           | tar -xJ -C /tmp
+  #         mv /tmp/bender-x86_64-unknown-linux-gnu/bender /usr/local/bin/bender
+  #
+  #     - name: Generate register files
+  #       run: make regs
+  #
+  #     - name: VHDL lint (GHDL + vsg)
+  #       run: make lint-vhdl
+  #
+  #     - name: SV lint (Verilator)
+  #       run: make lint-sv
+  #
+  # # ── VHDL simulation — VUnit + GHDL ───────────────────────────────────────────
+  # sim-vhdl-vunit:
+  #   name: "VHDL / GHDL / VUnit"
+  #   runs-on: ubuntu-latest
+  #   needs: regs
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.13"
+  #
+  #     - name: Install Python dependencies
+  #       run: make venv
+  #
+  #     - name: Cache OSS CAD Suite
+  #       id: cache-oss-cad-suite
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/tools/oss-cad-suite
+  #         key: oss-cad-suite-linux-x64-2026-08-27
+  #
+  #     - name: Install OSS CAD Suite
+  #       if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+  #       run: |
+  #         mkdir -p ~/tools
+  #         curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+  #           | tar -xz -C ~/tools
+  #
+  #     - name: Generate register files
+  #       run: make regs
+  #
+  #     - name: Run VUnit testbench
+  #       run: make sim FRAMEWORK=vunit
+  #
+  #     - name: Upload VUnit results
+  #       if: always()
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: vunit-results
+  #         path: vunit_out/
+  #
+  # # ── VHDL simulation — cocotb + GHDL ──────────────────────────────────────────
+  # sim-vhdl-cocotb:
+  #   name: "VHDL / GHDL / cocotb"
+  #   runs-on: ubuntu-latest
+  #   needs: regs
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.13"
+  #
+  #     - name: Install Python dependencies
+  #       run: make venv
+  #
+  #     - name: Cache OSS CAD Suite
+  #       id: cache-oss-cad-suite
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/tools/oss-cad-suite
+  #         key: oss-cad-suite-linux-x64-2026-08-27
+  #
+  #     - name: Install OSS CAD Suite
+  #       if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+  #       run: |
+  #         mkdir -p ~/tools
+  #         curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+  #           | tar -xz -C ~/tools
+  #
+  #     - name: Generate register files
+  #       run: make regs
+  #
+  #     - name: Run cocotb testbench (GHDL)
+  #       run: make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl
+  #
+  # # ── SV simulation — cocotb + Verilator ───────────────────────────────────────
+  # sim-sv-verilator:
+  #   name: "SV / Verilator / cocotb"
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.13"
+  #
+  #     - name: Install Python dependencies
+  #       run: make venv
+  #
+  #     - name: Cache OSS CAD Suite
+  #       id: cache-oss-cad-suite
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/tools/oss-cad-suite
+  #         key: oss-cad-suite-linux-x64-2026-08-27
+  #
+  #     - name: Install OSS CAD Suite
+  #       if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+  #       run: |
+  #         mkdir -p ~/tools
+  #         curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+  #           | tar -xz -C ~/tools
+  #
+  #     - name: Run cocotb testbench (Verilator)
+  #       run: make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv
+  #
+  # # ── SV simulation — cocotb + Icarus Verilog ───────────────────────────────────
+  # sim-sv-icarus:
+  #   name: "SV / Icarus / cocotb"
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.13"
+  #
+  #     - name: Install Python dependencies
+  #       run: make venv
+  #
+  #     - name: Cache OSS CAD Suite
+  #       id: cache-oss-cad-suite
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/tools/oss-cad-suite
+  #         key: oss-cad-suite-linux-x64-2026-08-27
+  #
+  #     - name: Install OSS CAD Suite
+  #       if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+  #       run: |
+  #         mkdir -p ~/tools
+  #         curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+  #           | tar -xz -C ~/tools
+  #
+  #     - name: Run cocotb testbench (Icarus)
+  #       run: make sim FRAMEWORK=cocotb SIM=icarus TOPLEVEL_HDL=sv
+  #
+  # # ── Yosys synthesis ───────────────────────────────────────────────────────────
+  # synth:
+  #   name: "Synthesis (Yosys XC7)"
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.13"
+  #
+  #     - name: Install Python dependencies
+  #       run: make venv
+  #
+  #     - name: Cache OSS CAD Suite
+  #       id: cache-oss-cad-suite
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/tools/oss-cad-suite
+  #         key: oss-cad-suite-linux-x64-2026-08-27
+  #
+  #     - name: Install OSS CAD Suite
+  #       if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+  #       run: |
+  #         mkdir -p ~/tools
+  #         curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+  #           | tar -xz -C ~/tools
+  #
+  #     - name: Generate register files
+  #       run: make regs
+  #
+  #     - name: Synthesise SV (native Yosys path)
+  #       run: make synth TOPLEVEL_HDL=sv
+  #
+  #     - name: Upload synthesis output
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: synthesis-output
+  #         path: synth/output/
 
   # ── hdl_autodoc Python test suite ─────────────────────────────────────────────
   test-autodoc:
