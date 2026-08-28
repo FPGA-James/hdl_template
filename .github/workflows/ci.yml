@@ -18,7 +18,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: make venv
 
       - name: Generate register files
         run: make regs
@@ -43,7 +43,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: make venv
 
       - name: Install GHDL
         run: |
@@ -56,11 +56,12 @@ jobs:
 
       - name: Install Bender
         run: |
-          curl -sSL https://github.com/pulp-platform/bender/releases/latest/download/bender-linux-x86_64.tar.gz \
-            | tar -xz -C /usr/local/bin/
+          curl -sSL https://github.com/pulp-platform/bender/releases/latest/download/bender-x86_64-unknown-linux-gnu.tar.xz \
+            | tar -xJ -C /tmp
+          mv /tmp/bender-x86_64-unknown-linux-gnu/bender /usr/local/bin/bender
 
       - name: Generate register files
-        run: pip install -r requirements.txt && make regs
+        run: make regs
 
       - name: VHDL lint (GHDL + vsg)
         run: make lint-vhdl
@@ -86,7 +87,7 @@ jobs:
           sudo apt-get install -y ghdl
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: make venv
 
       - name: Generate register files
         run: make regs
@@ -119,7 +120,7 @@ jobs:
           sudo apt-get install -y ghdl
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: make venv
 
       - name: Generate register files
         run: make regs
@@ -144,7 +145,7 @@ jobs:
           sudo apt-get install -y verilator
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: make venv
 
       - name: Run cocotb testbench (Verilator)
         run: make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv
@@ -166,7 +167,7 @@ jobs:
           sudo apt-get install -y iverilog
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: make venv
 
       - name: Run cocotb testbench (Icarus)
         run: make sim FRAMEWORK=cocotb SIM=icarus TOPLEVEL_HDL=sv
@@ -188,7 +189,7 @@ jobs:
           sudo apt-get install -y yosys
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: make venv
 
       - name: Generate register files
         run: make regs
@@ -216,7 +217,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: make venv
 
       - name: Run pytest
         run: make test-autodoc
@@ -249,8 +250,9 @@ jobs:
 
       - name: Install Bender
         run: |
-          curl -sSL https://github.com/pulp-platform/bender/releases/latest/download/bender-linux-x86_64.tar.gz \
-            | tar -xz -C /usr/local/bin/
+          curl -sSL https://github.com/pulp-platform/bender/releases/latest/download/bender-x86_64-unknown-linux-gnu.tar.xz \
+            | tar -xJ -C /tmp
+          mv /tmp/bender-x86_64-unknown-linux-gnu/bender /usr/local/bin/bender
 
       - name: Install NVC
         run: |
