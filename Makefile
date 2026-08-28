@@ -2,6 +2,15 @@
 # HDL Template — Top-Level Makefile
 # =============================================================================
 
+# Captured before PATH is overridden below: OSS CAD Suite bundles its own
+# python3 in py3bin/ (a stripped build with no working ensurepip), which
+# would otherwise shadow the interpreter the caller actually intended
+# (pyenv, a CI-pinned setup-python version, etc.) for `make venv`'s own
+# `python3 -m venv` bootstrap step. := evaluates $(shell ...) immediately,
+# using the PATH make itself inherited from its caller, not the exported
+# PATH below.
+SYSTEM_PYTHON3 := $(shell command -v python3)
+
 # ── OSS CAD Suite ─────────────────────────────────────────────────────────────
 # Path to the OSS CAD Suite install (bundles GHDL, Yosys, Verilator, Icarus).
 # Override with: make sim OSS_CAD_SUITE=/path/to/oss-cad-suite
@@ -146,7 +155,7 @@ endef
 
 venv: ## Create .venv and install all Python deps (run once)
 	@printf "\n\033[1m  Setting up Python virtual environment...\033[0m\n\n"
-	@python3 -m venv .venv
+	@$(SYSTEM_PYTHON3) -m venv .venv
 	@.venv/bin/python3 -m ensurepip --upgrade >/dev/null
 	@.venv/bin/python3 -m pip install --upgrade pip -q
 	@.venv/bin/python3 -m pip install -r requirements.txt -q
