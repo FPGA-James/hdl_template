@@ -25,9 +25,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from hdl_registers.parser.toml import from_toml
+from hdl_registers.register_array import RegisterArray
 from hdl_registers.generator.vhdl.register_package import VhdlRegisterPackageGenerator
 from hdl_registers.generator.vhdl.record_package import VhdlRecordPackageGenerator
 from hdl_registers.generator.vhdl.axi_lite.wrapper import VhdlAxiLiteWrapperGenerator
+from hdl_registers.generator.vhdl.simulation.read_write_package import (
+    VhdlSimulationReadWritePackageGenerator,
+)
 from hdl_registers.generator.systemverilog.axi_lite.register_file import (
     SystemVerilogAxiLiteGenerator,
 )
@@ -369,6 +373,41 @@ def _make_sv_synthesizable(text: str) -> str:
     return text
 
 
+def render_sv_address_constants(register_list) -> str:
+    """Generate a small SV package with one localparam per plain register's
+    byte address (4 * the register's real index within the register list)
+    -- the same computation the VHDL path's generated read/write package
+    uses internally. Verified: generated for this project's real register
+    map, compiled and ran cleanly under both Verilator and Icarus.
+
+    Uses each register's own `.index` attribute, not its position in
+    `register_objects` (via `enumerate()`): a `RegisterArray` earlier in
+    the list consumes multiple indices (one per array element) but is a
+    single entry in `register_objects`, so positional enumeration silently
+    produces wrong addresses for every plain register that follows one.
+    `RegisterArray` entries themselves are skipped -- they have no single
+    address of their own, and this template's register auto-wiring
+    doesn't support arrays anyway (each field must resolve to one
+    <name>_core port).
+
+    Names are deliberately lowercase (demo_conf_addr, not DEMO_CONF_ADDR):
+    <<NAME>> template substitution is a literal, case-preserving text
+    replacement, so only lowercase-project-name-prefixed identifiers are
+    reachable from a template testbench file written pre-init. This also
+    matches <name>_regs_pkg.vhd's existing lowercase constant convention
+    (demo_conf, demo_command, demo_status).
+    """
+    name = register_list.name
+    lines = [f"package {name}_regs_addr_pkg;"]
+    for register in register_list.register_objects:
+        if isinstance(register, RegisterArray):
+            continue
+        const_name = f"{name}_{register.name}_addr"
+        lines.append(f"    localparam int unsigned {const_name} = 4 * {register.index};")
+    lines.append("endpackage")
+    return "\n".join(lines) + "\n"
+
+
 def generate_sv(register_list, output_folder: Path) -> None:
     """Generate the SystemVerilog AXI-Lite register file and its types package.
     Uses flatten_axi_lite=True so the bus side is discrete signals (s_axil_*),
@@ -389,6 +428,9 @@ def generate_sv(register_list, output_folder: Path) -> None:
     ):
         generated_file = output_folder / filename
         generated_file.write_text(_make_sv_synthesizable(generated_file.read_text()))
+
+    addr_pkg_file = output_folder / f"{register_list.name}_regs_addr_pkg.sv"
+    addr_pkg_file.write_text(render_sv_address_constants(register_list))
 
 
 # =============================================================================
@@ -507,6 +549,7 @@ def generate_from_toml(toml_path: Path) -> None:
         VhdlRegisterPackageGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
         VhdlRecordPackageGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
         VhdlAxiLiteWrapperGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
+        VhdlSimulationReadWritePackageGenerator(register_list=register_list, output_folder=GEN_VHDL).create()
     else:
         generate_sv(register_list, GEN_SV)
 

@@ -74,7 +74,7 @@ VHDL_REG_FILE    = $(HDL_MODULES)/modules/register_file/src/register_file_pkg.vh
 # Phony targets
 # =============================================================================
 .PHONY: all venv install init deps lsp vhdl-ls verible-ls filelist regs \
-        sim sim-vunit sim-vunit-gui sim-cocotb sim-native sim-native-vhdl sim-native-sv \
+        sim sim-vunit sim-vunit-gui sim-cocotb sim-native sim-native-vhdl sim-native-sv sim-cpp \
         synth synth-gui impl impl-gui icestudio \
         hierarchy scaffold extract coverage reports html pdf doc \
         lint lint-vhdl lint-sv \
@@ -220,16 +220,16 @@ endif
 sim-vunit: regs ## Run VUnit testbench via GHDL (VHDL only)
 	$(call check-venv)
 	@printf "\n\033[1m  Running VUnit simulation (GHDL)...\033[0m\n\n"
-	@VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py $(VUNIT_ARGS)
+	@BENDER=$(BENDER) VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py $(VUNIT_ARGS)
 
 sim-vunit-gui: regs ## Open VUnit testbench in the GHDL waveform viewer
 	$(call check-venv)
-	@VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py --gui $(VUNIT_ARGS)
+	@BENDER=$(BENDER) VUNIT_SIMULATOR=ghdl $(PYTHON) tb/vunit/run.py --gui $(VUNIT_ARGS)
 
 sim-cocotb: regs ## Run cocotb testbench  [SIM=  TOPLEVEL_HDL=vhdl|sv]
 	@mkdir -p waves
 	@printf "\n\033[1m  Running cocotb simulation ($(SIM))...\033[0m\n\n"
-	@$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL)
+	@$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL) BENDER=$(BENDER)
 
 NATIVE_RDIR = out/native
 
@@ -240,14 +240,22 @@ else
 	$(MAKE) sim-native-vhdl
 endif
 
+NATIVE_NVC_LIBDIR = $(NATIVE_RDIR)/nvc_libs
+
 sim-native-vhdl: regs ## Compile+elaborate+run tb/native/vhdl/<<NAME>>_tb.vhd directly with NVC (no framework)
 	$(call check-nvc)
 	@printf "\n\033[1m  Running native VHDL simulation (NVC)...\033[0m\n\n"
-	@mkdir -p $(NATIVE_RDIR)/nvc_work
-	@$(NVC) --std=2008 --work=$(NATIVE_RDIR)/nvc_work -a \
-	  src/vhdl/<<NAME>>_pkg.vhd src/vhdl/<<NAME>>_core.vhd tb/native/vhdl/<<NAME>>_tb.vhd
-	@$(NVC) --work=$(NATIVE_RDIR)/nvc_work -e <<NAME>>_tb
-	@$(NVC) --work=$(NATIVE_RDIR)/nvc_work -r <<NAME>>_tb
+	@mkdir -p $(NATIVE_NVC_LIBDIR) $(NATIVE_RDIR)/nvc_work
+	@printf "  \033[2m[nvc]\033[0m Compiling axi_lite library...\n"
+	@$(NVC) --std=2008 --work=axi_lite:$(NATIVE_NVC_LIBDIR)/axi_lite -a \
+	  $(VHDL_AXI_LITE)
+	@printf "  \033[2m[nvc]\033[0m Compiling register_file library...\n"
+	@$(NVC) --std=2008 --work=register_file:$(NATIVE_NVC_LIBDIR)/register_file \
+	  -L $(NATIVE_NVC_LIBDIR) -a $(VHDL_REG_FILE)
+	@$(NVC) --std=2008 --work=$(NATIVE_RDIR)/nvc_work -L $(NATIVE_NVC_LIBDIR) -a \
+	  $(VHDL_GEN) $(VHDL_RTL) tb/native/vhdl/<<NAME>>_tb.vhd
+	@$(NVC) --work=$(NATIVE_RDIR)/nvc_work -L $(NATIVE_NVC_LIBDIR) -e <<NAME>>_tb
+	@$(NVC) --work=$(NATIVE_RDIR)/nvc_work -L $(NATIVE_NVC_LIBDIR) -r <<NAME>>_tb
 	@printf "\n\033[32m  ✓\033[0m Native VHDL simulation passed\n\n"
 
 sim-native-sv: regs ## Compile+run tb/native/sv/<<NAME>>_tb.sv directly with Verilator --binary (no framework)
@@ -255,9 +263,30 @@ sim-native-sv: regs ## Compile+run tb/native/sv/<<NAME>>_tb.sv directly with Ver
 	@mkdir -p $(NATIVE_RDIR)/verilator_obj
 	@$(OSS_CAD_SUITE)/bin/verilator --binary --timing -Wall -Wno-fatal -j 0 \
 	  -Mdir $(NATIVE_RDIR)/verilator_obj --top-module <<NAME>>_tb \
-	  src/sv/<<NAME>>_pkg.sv src/sv/<<NAME>>_core.sv tb/native/sv/<<NAME>>_tb.sv
+	  tb/native/sv/axi_lite_driver_pkg.sv \
+	  src/sv/<<NAME>>_pkg.sv \
+	  $(SV_GEN) \
+	  src/sv/<<NAME>>_core.sv src/sv/<<NAME>>_top.sv \
+	  tb/native/sv/<<NAME>>_tb.sv
 	@$(NATIVE_RDIR)/verilator_obj/V<<NAME>>_tb
 	@printf "\n\033[32m  ✓\033[0m Native SystemVerilog simulation passed\n\n"
+
+sim-cpp: regs ## Compile+run tb/cpp/<<NAME>>_tb.cpp directly with Verilator --cc --exe --build (SV only)
+ifneq ($(TOPLEVEL_HDL),sv)
+	$(error sim-cpp requires TOPLEVEL_HDL=sv -- Verilator does not read VHDL)
+endif
+	@printf "\n\033[1m  Running C++ testbench (Verilator --cc --exe --build)...\033[0m\n\n"
+	@mkdir -p $(NATIVE_RDIR)/cpp_obj
+	@$(OSS_CAD_SUITE)/bin/verilator --cc --exe --build -Wall -Wno-fatal -j 0 \
+	  -Mdir $(NATIVE_RDIR)/cpp_obj --top-module <<NAME>>_top \
+	  src/sv/<<NAME>>_pkg.sv \
+	  $(SV_GEN) \
+	  src/sv/<<NAME>>_core.sv src/sv/<<NAME>>_top.sv \
+	  tb/cpp/<<NAME>>_tb.cpp \
+	  -CFLAGS "-I$(CURDIR)/tb/cpp -I$(CURDIR)/out/regs/c" \
+	  -o <<NAME>>_tb_cpp
+	@$(NATIVE_RDIR)/cpp_obj/<<NAME>>_tb_cpp
+	@printf "\n\033[32m  ✓\033[0m C++ testbench passed\n\n"
 
 # =============================================================================
 # Synthesis

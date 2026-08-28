@@ -2,8 +2,25 @@
 # Install via: make venv (creates .venv/) or pip install -r requirements.txt
 
 # ── Verification frameworks ───────────────────────────────────────────────────
-vunit-hdl>=4.7
+# vunit-hdl: pinned to the 5.0.0 pre-release line (not >=4.7) because
+# hdl-modules' bfm/axi_lite_master.vhd (used by tb/vunit/run.py to drive
+# <name>_top's real AXI-Lite register interface) is only compatible with
+# VUnit >= 5.0.0 -- hdl-modules documents this explicitly ("Add note on
+# pre-release VUnit", hdl-modules commit f7ccb1a, getting_started.rst).
+# VUnit 5.0.0 is not yet on a stable PyPI release, but its pre-release
+# builds are: `pip install "vunit-hdl>=5.0.0.dev5"` resolves to one without
+# needing --pre, since the specifier itself names a pre-release version.
+# Verified: 5.0.0.dev11 compiles and runs the VUnit testbench cleanly.
+# Note the VUnit 5 API change this also required in tb/vunit/run.py:
+# VUnit.from_argv() no longer takes compile_builtins= (call
+# add_vhdl_builtins() explicitly instead, which run.py already does).
+# TODO: revisit this pin once VUnit 5.0.0 ships on stable PyPI.
+vunit-hdl>=5.0.0.dev5
 cocotb>=2.0
+# cocotbext-axi: drives <name>_top's real AXI-Lite register interface from
+# tb/cocotb/test_NAME.py (AxiLiteMaster/AxiLiteBus), instead of poking
+# <name>_core's plain ports directly.
+cocotbext-axi
 
 # ── Register generation ───────────────────────────────────────────────────────
 hdl-registers>=8.0

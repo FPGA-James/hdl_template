@@ -87,6 +87,7 @@ run_lang() {
 
     if [[ "$lang" == vhdl ]]; then
         step "$lang" "lint-vhdl"        make lint-vhdl
+        step "$lang" "install-osvvm"    nvc --install osvvm
         step "$lang" "sim-native"       make sim-native TOPLEVEL_HDL=vhdl
         step "$lang" "sim-cocotb-ghdl"  make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl
         step "$lang" "sim-vunit"        make sim FRAMEWORK=vunit
@@ -95,6 +96,7 @@ run_lang() {
         step "$lang" "lint-sv"              make lint-sv
         step "$lang" "sim-native"           make sim-native TOPLEVEL_HDL=sv
         step "$lang" "sim-cocotb-verilator" make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv
+        step "$lang" "sim-cpp"              make sim-cpp TOPLEVEL_HDL=sv
         step "$lang" "synth"                make synth TOPLEVEL_HDL=sv
     fi
 

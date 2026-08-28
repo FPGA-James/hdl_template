@@ -14,6 +14,8 @@ All HDL tools (GHDL, Yosys, Verilator, Icarus, nextpnr) are expected to come fro
 
 **Known macOS gap**: `make html`/`make pdf`/`make coverage` can crash on import with `OSError: cannot load library 'libxcb.dylib'`. This is `sphinxcontrib.wavedrom` unconditionally importing `cairosvg` → `cairocffi` → `xcffib` at module-import time — `xcffib` needs `libxcb.dylib` resolvable via `cffi`'s `dlopen()`, which behaves differently from `ctypes.util.find_library()` and isn't satisfied by `brew install cairo` alone (`DYLD_LIBRARY_PATH=/opt/homebrew/lib` fixes `find_library()` but not the `make`-spawned Sphinx subprocess, likely SIP stripping `DYLD_*`). This triggers regardless of whether the project actually uses any `.. wavedrom::` directive or `SCHEMATICS=1`. Third-party packaging issue (`xcffib`/`cairocffi` on macOS), not fixable by editing this repo. Untested whether Linux CI hits the same gap.
 
+**Pre-existing SV doc-coverage gap**: `make html`/`make coverage` for a SystemVerilog project (`TOPLEVEL_HDL=sv`) fail at the `hierarchy` step with `IndexError: list index out of range` in `parse_hierarchy.py`'s `build_hierarchy()`, before ever reaching the macOS gap above. Root cause: `scripts/gen_filelist.sh` intentionally excludes SV sources from the doc filelist ("SV files are alternate simulation targets, not doc targets" — see the script's own trailing comment), so `filelist.f` has zero source files for an SV project and `parse_hierarchy.py` crashes on an empty module list instead of failing gracefully. This predates the testbenches-target-`_top` migration (confirmed via `git log -- scripts/gen_filelist.sh`, last touched by pre-migration commits) and is unrelated to it — HDL AutoDoc's Sphinx pipeline simply doesn't support SV projects yet. `make synth`/`make impl` and all SV simulation flows (including `sim-cpp`) are unaffected, since they don't go through `parse_hierarchy.py`.
+
 **SV register-file synthesizability**: `hdl_registers`' SystemVerilog generator delegates to PeakRDL-regblock, which unconditionally emits **unpacked** SV structs for its `hwif_in`/`hwif_out` types and `automatic` locals inside `always_comb` blocks — neither supported by free/OSS Yosys's native `read_verilog -sv` frontend (`"Only PACKED supported at this time"` / `"unexpected TOK_AUTOMATIC"`), which would otherwise break `make synth TOPLEVEL_HDL=sv`/`make impl TOPLEVEL_HDL=sv` for any project using the register auto-wiring feature. `generate_sv()` in `scripts/gen_regs.py` (`_make_sv_synthesizable`) post-processes both generated files to work around this — packing every struct level (verified safe: no code anywhere bit-slices a struct as a flat vector) and stripping `automatic` (verified safe: these blocks never recurse or run concurrently) — verified via a full `synth` run producing a clean netlist, with no change in behavior for Verilator-based flows (`lint-sv`, `sim-cocotb-verilator`, `sim-native`). **Residual gap**: `make sim FRAMEWORK=cocotb SIM=icarus TOPLEVEL_HDL=sv` was found to *already* fail on PeakRDL-regblock's unmodified output for the same two reasons (Icarus independently rejects both constructs) — a gap `scripts/smoke_test.sh` doesn't catch since its SV cocotb row only exercises `SIM=verilator`. The post-processing fix downgrades this from a hard compile failure to compiling with `"sorry: constant selects in always_* processes are not currently supported (all bits will be included)"` warnings — plausibly benign, since nothing here depends on partial-bit-select semantics inside those blocks, but not independently verified for simulation fidelity the way the Yosys/Verilator paths were. Untested with Icarus-based cocotb SV runs.
 
 ## Initial Setup (one-time)
@@ -110,11 +112,14 @@ src/sv/          SystemVerilog RTL (same structure, identical port names)
 regs/            TOML register definitions (source of truth)
 out/             GENERATED outputs (gitignored)
   out/regs/vhdl/ VHDL register packages + AXI-Lite wrapper
+  out/regs/sv/   SV register file + address-constants package (SV projects only)
   out/regs/c/    C header files
   out/regs/html/ HTML register documentation
 tb/vunit/        VUnit runner (run.py) + VHDL testbenches
 tb/cocotb/       cocotb Makefile + Python test modules
+  tb/cocotb/vhdl/  GHDL-only flattening wrapper (see Simulator / Framework Routing above)
 tb/native/       Framework-less testbenches (tb/native/vhdl, tb/native/sv) run directly by NVC / Verilator
+tb/cpp/          Framework-less C++ testbench + hand-rolled AXI-Lite driver, run directly by Verilator --cc --exe --build
 synth/           Yosys synthesis scripts (.ys) + XDC constraints
 scripts/
   hdl_autodoc/   HDL AutoDoc extraction pipeline (unchanged from HDLAutoDoc)
@@ -141,13 +146,26 @@ docs/            Sphinx documentation source (RST shells + conf.py)
 | `FRAMEWORK` | `SIM`      | `TOPLEVEL_HDL` | Mechanism             |
 |-------------|------------|----------------|-----------------------|
 | `vunit`     | ghdl       | vhdl           | VUnit → GHDL via VHPI |
-| `cocotb`    | ghdl       | vhdl           | cocotb → GHDL via VHPI|
+| `cocotb`    | ghdl       | vhdl           | cocotb → GHDL via VPI |
 | `cocotb`    | verilator  | sv             | cocotb → Verilator VPI|
 | `cocotb`    | icarus     | sv             | cocotb → iverilog VPI |
 
 The `tb/cocotb/Makefile` enforces valid combinations with an error guard.
 
-`make sim-native TOPLEVEL_HDL=vhdl|sv` is a separate, framework-less path — it compiles and runs `tb/native/vhdl/NAME_tb.vhd` directly with NVC, or `tb/native/sv/NAME_tb.sv` directly with `verilator --binary --timing`, with no VUnit/cocotb dependency. Both testbenches target `<<NAME>>_core` directly (not `_top`), matching the VUnit and cocotb testbenches, so the AXI-Lite register block and `hdl-modules` are not involved.
+The `cocotb`/`ghdl`/`vhdl` row targets a thin wrapper entity,
+`tb/cocotb/vhdl/<<NAME>>_cocotb_top.vhd`, not `<<NAME>>_top` directly:
+GHDL's VPI backend cannot expose VHDL record-typed ports (used by
+`<<NAME>>_top`'s AXI-Lite `s_axi_m2s`/`s_axi_s2m` ports) to cocotb at
+all, so the wrapper flattens them into flat signals (matching the SV
+side's native naming) around an unmodified `<<NAME>>_top` instance.
+`<<NAME>>_top.vhd` itself is untouched; the SV path needs no such
+wrapper since its ports are already flat.
+
+Every testbench above targets `<<NAME>>_top` (not `_core`), driving it over its real AXI-Lite register interface: VUnit uses `hdl_registers`' generated read/write package plus `hdl-modules`' `axi_lite_master` BFM; cocotb (both languages) uses `cocotbext-axi`'s `AxiLiteMaster`.
+
+`make sim-native TOPLEVEL_HDL=vhdl|sv` is a separate, framework-less path — it compiles and runs `tb/native/vhdl/NAME_tb.vhd` directly with NVC (using OSVVM's `Axi4LiteManager` — install once via `nvc --install osvvm`), or `tb/native/sv/NAME_tb.sv` directly with `verilator --binary --timing` (using a small hand-rolled AXI-Lite driver, `tb/native/sv/axi_lite_driver_pkg.sv` — no off-the-shelf, non-UVM, Verilator-compatible SV BFM exists). Both also target `<<NAME>>_top`.
+
+`make sim-cpp TOPLEVEL_HDL=sv` compiles and runs `tb/cpp/<<NAME>>_tb.cpp` via `verilator --cc --exe --build`, using a small hand-rolled AXI-Lite driver (`tb/cpp/axi_lite_driver.hpp`) — the conventional way to write a Verilator C++ harness for a bus this simple. SV-only; Verilator doesn't read VHDL.
 
 ### Register Generation
 
@@ -155,12 +173,13 @@ Register definitions live in `regs/<name>_regs.toml` using the `hdl_registers` T
 - `out/regs/vhdl/<name>_regs_pkg.vhd` — address/field constants
 - `out/regs/vhdl/<name>_register_record_pkg.vhd` — typed VHDL records
 - `out/regs/vhdl/<name>_register_file_axi_lite.vhd` — AXI-Lite register entity (this is `<<NAME>>_regs`)
+- `out/regs/vhdl/<name>_register_read_write_pkg.vhd` — VUnit-only simulation read/write procedures, used by `tb/vunit/vhdl/<name>_tb.vhd` to drive registers over `net`/`bus_handle` message passing instead of raw signal manipulation
 - `out/regs/c/<name>_regs.h` — C header for embedded drivers
 - `out/regs/html/<name>_regs.html` — register documentation
 
 The generated AXI-Lite entity requires the `hdl-modules` library (fetched via `make deps`).
 
-For SystemVerilog projects, `make regs` instead generates `out/regs/sv/<name>_register_file_axi_lite.sv` and `out/regs/sv/<name>_register_file_axi_lite_pkg.sv` via PeakRDL-regblock (through `hdl_registers`' SystemVerilog generator, `flatten_axi_lite=True`).
+For SystemVerilog projects, `make regs` instead generates `out/regs/sv/<name>_register_file_axi_lite.sv` and `out/regs/sv/<name>_register_file_axi_lite_pkg.sv` via PeakRDL-regblock (through `hdl_registers`' SystemVerilog generator, `flatten_axi_lite=True`), plus `out/regs/sv/<name>_regs_addr_pkg.sv` — a small lowercase-named localparam package (one per register's byte address) consumed by `tb/native/sv/<name>_tb.sv`, since `<<NAME>>` template substitution can't produce the C header's uppercase macro names pre-init.
 
 `make regs` also auto-wires each register field to a matching `<name>_core` port, rewriting only the marker-delimited region(s) inside `<name>_top` (VHDL: `-- BEGIN/END AUTOGEN REGISTER SIGNALS` plus `-- BEGIN/END AUTOGEN REGISTERS`; SV: `// BEGIN/END AUTOGEN REGISTERS`). Field leaf names must be unique across the whole register map (each resolves to a distinct `<name>_core` port) — see the "SV register-file synthesizability" note above for the residual Icarus gap this introduces.
 

@@ -105,7 +105,7 @@ The template ships with a saturating pulse counter as the example design. Three-
   └── <name>_core  ← pure logic, register signals in/out
 ```
 
-Both VHDL (`src/vhdl/`) and SystemVerilog (`src/sv/`) implementations have identical port names, so the cocotb testbench (`tb/cocotb/test_<name>.py`) runs unchanged against either.
+Both VHDL (`src/vhdl/`) and SystemVerilog (`src/sv/`) implementations have identical port names, so the cocotb testbench (`tb/cocotb/test_<name>.py`) runs unchanged against either — the VHDL path targets a thin flattening wrapper (`tb/cocotb/vhdl/<name>_cocotb_top.vhd`) around an unmodified `<name>_top`, since GHDL's VPI backend can't expose VHDL record-typed ports to cocotb directly; the test file itself needs no per-language changes.
 
 > **After `make init`**, the chosen language's files are moved to a flat `src/` with no subdirectory. The unused language folder is deleted.
 
@@ -120,6 +120,7 @@ make deps            Fetch external HDL repos via Bender (bender update)
 make regs            Generate register files from regs/*.toml → out/regs/
 make sim             Run testbench (see FRAMEWORK/SIM/TOPLEVEL_HDL vars)
 make sim-native      Run the framework-less testbench directly with NVC/Verilator [TOPLEVEL_HDL=vhdl|sv]
+make sim-cpp         Run the C++ testbench directly with Verilator --cc --exe --build [TOPLEVEL_HDL=sv only]
 make lint            VHDL: GHDL analysis + vsg  |  SV: Verilator --lint-only
 make lint-vhdl       VHDL lint only
 make lint-sv         SV lint only
@@ -268,7 +269,7 @@ The `docs.yml` workflow builds Sphinx HTML and deploys to GitHub Pages on every 
 | Verilator | SV sim + lint | `apt install verilator` / `brew install verilator` |
 | Icarus Verilog | SV sim (icarus path) | `apt install iverilog` / `brew install icarus-verilog` |
 | Yosys | Synthesis | `apt install yosys` / [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build/releases) |
-| [NVC](https://www.nickg.me.uk/nvc/) | `make sim-native TOPLEVEL_HDL=vhdl` | `brew install nvc` / [releases](https://github.com/nickg/nvc/releases) — not part of OSS CAD Suite |
+| [NVC](https://www.nickg.me.uk/nvc/) | `make sim-native TOPLEVEL_HDL=vhdl` | `brew install nvc` / [releases](https://github.com/nickg/nvc/releases) — not part of OSS CAD Suite; also run `nvc --install osvvm` once, needed by the native VHDL testbench |
 | Graphviz | Documentation diagrams | `apt install graphviz` / `brew install graphviz` |
 | Bender | Dependency management | [releases](https://github.com/pulp-platform/bender/releases) |
 | VHDL LS (`hbohlin.vhdl-ls`) | VHDL editor intelligence | VS Code extension |

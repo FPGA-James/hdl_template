@@ -132,6 +132,7 @@ done < <(find . \
         -o -name "*.rst" -o -name "*.md"  -o -name "*.txt"  \
         -o -name "Makefile" -o -name "*.mk" -o -name "*.core" \
         -o -name "*.f"   -o -name "*.ys"  -o -name "*.xdc"  \
+        -o -name "*.cpp" -o -name "*.h"   -o -name "*.hpp"  \
         -o -name "Bender.yml" \
     \) -print0 2>/dev/null)
 
@@ -154,6 +155,7 @@ done < <(find . \
         -name "NAME_*.vhd" -o -name "NAME_*.sv" -o -name "NAME_*.v" \
         -o -name "NAME_*.py" -o -name "NAME_*.toml" -o -name "NAME_*.ys" \
         -o -name "NAME_*.xdc" -o -name "NAME_*.rst" \
+        -o -name "NAME_*.cpp" -o -name "NAME_*.h" -o -name "NAME_*.hpp" \
     \) -print0 2>/dev/null)
 
 for f in "${RENAME_CANDIDATES[@]}"; do
