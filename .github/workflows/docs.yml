@@ -32,8 +32,27 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y graphviz
 
+      - name: Install Bender
+        run: |
+          curl -sSL https://github.com/pulp-platform/bender/releases/latest/download/bender-x86_64-unknown-linux-gnu.tar.xz \
+            | tar -xJ -C /tmp
+          mv /tmp/bender-x86_64-unknown-linux-gnu/bender /usr/local/bin/bender
+
+      # This workflow builds directly on main, which (like every branch of
+      # this template repo) still has <<NAME>> placeholders throughout --
+      # scripts/gen_filelist.sh isn't even valid bash syntax until `make
+      # init` replaces them, so there is no real project to document
+      # without this step. Publishes documentation for the template's own
+      # bundled example design (a saturating pulse counter) as a working
+      # demonstration of what this template's docs pipeline produces.
+      - name: Initialise example project
+        run: make init NAME=pulse_counter TOPLEVEL_HDL=vhdl
+
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: make venv
+
+      - name: Fetch HDL dependencies
+        run: make deps
 
       - name: Generate register files
         run: make regs
