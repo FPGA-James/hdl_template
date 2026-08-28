@@ -45,14 +45,19 @@ jobs:
       - name: Install Python dependencies
         run: make venv
 
-      - name: Install GHDL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ghdl
+      - name: Cache OSS CAD Suite
+        id: cache-oss-cad-suite
+        uses: actions/cache@v4
+        with:
+          path: ~/tools/oss-cad-suite
+          key: oss-cad-suite-linux-x64-2026-08-27
 
-      - name: Install Verilator
+      - name: Install OSS CAD Suite
+        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get install -y verilator
+          mkdir -p ~/tools
+          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+            | tar -xz -C ~/tools
 
       - name: Install Bender
         run: |
@@ -81,13 +86,22 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install GHDL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ghdl
-
       - name: Install Python dependencies
         run: make venv
+
+      - name: Cache OSS CAD Suite
+        id: cache-oss-cad-suite
+        uses: actions/cache@v4
+        with:
+          path: ~/tools/oss-cad-suite
+          key: oss-cad-suite-linux-x64-2026-08-27
+
+      - name: Install OSS CAD Suite
+        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/tools
+          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+            | tar -xz -C ~/tools
 
       - name: Generate register files
         run: make regs
@@ -114,13 +128,22 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install GHDL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ghdl
-
       - name: Install Python dependencies
         run: make venv
+
+      - name: Cache OSS CAD Suite
+        id: cache-oss-cad-suite
+        uses: actions/cache@v4
+        with:
+          path: ~/tools/oss-cad-suite
+          key: oss-cad-suite-linux-x64-2026-08-27
+
+      - name: Install OSS CAD Suite
+        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/tools
+          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+            | tar -xz -C ~/tools
 
       - name: Generate register files
         run: make regs
@@ -139,13 +162,22 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install Verilator
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y verilator
-
       - name: Install Python dependencies
         run: make venv
+
+      - name: Cache OSS CAD Suite
+        id: cache-oss-cad-suite
+        uses: actions/cache@v4
+        with:
+          path: ~/tools/oss-cad-suite
+          key: oss-cad-suite-linux-x64-2026-08-27
+
+      - name: Install OSS CAD Suite
+        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/tools
+          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+            | tar -xz -C ~/tools
 
       - name: Run cocotb testbench (Verilator)
         run: make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv
@@ -161,13 +193,22 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install Icarus Verilog
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y iverilog
-
       - name: Install Python dependencies
         run: make venv
+
+      - name: Cache OSS CAD Suite
+        id: cache-oss-cad-suite
+        uses: actions/cache@v4
+        with:
+          path: ~/tools/oss-cad-suite
+          key: oss-cad-suite-linux-x64-2026-08-27
+
+      - name: Install OSS CAD Suite
+        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/tools
+          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+            | tar -xz -C ~/tools
 
       - name: Run cocotb testbench (Icarus)
         run: make sim FRAMEWORK=cocotb SIM=icarus TOPLEVEL_HDL=sv
@@ -183,13 +224,22 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install Yosys
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y yosys
-
       - name: Install Python dependencies
         run: make venv
+
+      - name: Cache OSS CAD Suite
+        id: cache-oss-cad-suite
+        uses: actions/cache@v4
+        with:
+          path: ~/tools/oss-cad-suite
+          key: oss-cad-suite-linux-x64-2026-08-27
+
+      - name: Install OSS CAD Suite
+        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/tools
+          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+            | tar -xz -C ~/tools
 
       - name: Generate register files
         run: make regs
@@ -243,10 +293,24 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install HDL toolchain
+      - name: Install doc dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ghdl yosys verilator iverilog graphviz libxcb1
+          sudo apt-get install -y graphviz libxcb1
+
+      - name: Cache OSS CAD Suite
+        id: cache-oss-cad-suite
+        uses: actions/cache@v4
+        with:
+          path: ~/tools/oss-cad-suite
+          key: oss-cad-suite-linux-x64-2026-08-27
+
+      - name: Install OSS CAD Suite
+        if: steps.cache-oss-cad-suite.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/tools
+          curl -sSL https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-08-27/oss-cad-suite-linux-x64-20260827.tgz \
+            | tar -xz -C ~/tools
 
       - name: Install Bender
         run: |
