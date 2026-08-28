@@ -31,13 +31,13 @@ export VERILATOR_ROOT ?= $(OSS_CAD_SUITE)/share/verilator
 
 # ── User-configurable variables ───────────────────────────────────────────────
 # Verification framework: vunit | cocotb | native
-FRAMEWORK    ?= cocotb
+FRAMEWORK    ?= vunit
 
 # Simulator: ghdl | verilator | icarus
-SIM          ?= verilator
+SIM          ?= ghdl
 
 # HDL language for simulation/synthesis: vhdl | sv
-TOPLEVEL_HDL ?= sv
+TOPLEVEL_HDL ?= vhdl
 
 # Top-level entity/module name (set by make init; matches <<NAME>>_top)
 TOPLEVEL     ?= <<NAME>>_top
