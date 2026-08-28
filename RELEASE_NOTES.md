@@ -1,5 +1,21 @@
 # Release Notes
 
+## V1.4.0 — CI actually works
+
+Both GitHub Actions workflows (`ci.yml`, `docs.yml`) had never fully passed since this repo's first commit. All of it traces back to real, fixable infrastructure bugs, not the `<<NAME>>`-placeholder limitation already known about — that limitation is real too, but it was never the thing actually blocking every run.
+
+- **`make venv` was never called.** Every CI job ran `pip install -r requirements.txt` directly instead, but every Makefile target is gated on `.venv/` actually existing — so every job failed immediately, unconditionally, on every push, forever. Now every job runs `make venv`.
+- **Bender's download URL was stale.** Upstream renamed release assets and switched compression format (`bender-linux-x86_64.tar.gz` → `bender-x86_64-unknown-linux-gnu.tar.xz`); the old URL 404s.
+- **`OSS_CAD_SUITE` was never actually installed on CI** — jobs `apt-get install`ed GHDL/Yosys/Verilator/Icarus as plain system packages instead, but the Makefile always invokes tools via `$(OSS_CAD_SUITE)/bin/<tool>`. CI now installs and caches the real OSS CAD Suite, matching documented local dev setup.
+- Fixing the above two uncovered two more, deeper bugs, both real and both now fixed: OSS CAD Suite's own bundled Python (no working `ensurepip`) was shadowing the intended interpreter for `make venv`'s own bootstrap step; and a relative-path bug (`.venv/bin` vs `$(CURDIR)/.venv/bin`) let OSS CAD Suite's own bundled `cocotb` (a pre-release build with a real internal bug) shadow the project's pinned one once `tb/cocotb/Makefile` changed directory.
+- **`scripts/gen_filelist.sh` excluded SystemVerilog sources from the documentation pipeline unconditionally.** HDL AutoDoc genuinely supports SV projects (hierarchy parsing, a working — if plainer, since `sphinx-vhdl`'s structured entity tables are VHDL-only upstream — RST fallback, native-Yosys schematics); the exclusion was meant to avoid a real duplicate-module-name collision that only actually happens pre-`make init` (when both `src/vhdl/` and `src/sv/` coexist), but applied unconditionally, breaking the far more common single-language case too. `make html`/`make coverage` now work for SV projects.
+- **`docs.yml` built directly on `main`**, the raw un-initialised template — which can never produce real documentation, since `scripts/gen_filelist.sh` isn't even valid bash syntax until `make init` replaces its `<<NAME>>` placeholders. Now initialises the template's own bundled example (a saturating pulse counter) first, mirroring how `ci.yml`'s `smoke-test` job already does this, and actually builds successfully.
+- **Six CI jobs that could never pass by design** (`lint`, `sim-vhdl-vunit`, `sim-vhdl-cocotb`, `sim-sv-verilator`, `sim-sv-icarus`, `synth` — all running against the raw un-initialised checkout) are now commented out rather than left permanently red; `smoke-test` (which runs `make init` first) remains the reliable, working signal it always was meant to be.
+- **`docs.yml`'s `deploy` job is commented out** until GitHub Pages is enabled for this repo (a one-time manual `Settings → Pages` step) — `build` still runs and verifies documentation builds correctly on every push.
+- **Restored `vunit`/`ghdl`/`vhdl` as the real Makefile defaults** (`FRAMEWORK`/`SIM`/`TOPLEVEL_HDL`), matching what every doc already claimed — they had drifted to `cocotb`/`verilator`/`sv`, so `make init NAME=x` (no override) was silently creating an SV project despite being documented "VHDL project (default)".
+
+Result: `ci.yml` and `docs.yml` are both fully green on every push, for the first time in this repo's history.
+
 ## V1.3.0 — Testbenches target `_top` via real AXI-Lite
 
 Every testbench (VUnit, cocotb for VHDL/SV, native-vhdl, native-sv) now drives `<name>_top`'s real AXI4-Lite register interface instead of `<name>_core`'s raw ports directly — exercising the auto-wired register integration, not just the core logic in isolation. Adds a new C++ testbench path.
