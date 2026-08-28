@@ -65,14 +65,21 @@ jobs:
         with:
           path: out/docs/html/
 
-  deploy:
-    name: Deploy to GitHub Pages
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+  # Disabled: fails with "Ensure GitHub Pages has been enabled" until Pages
+  # is turned on for this repo (Settings → Pages → Source: GitHub Actions,
+  # a one-time manual step no workflow can do on its own). `build` above
+  # still runs and succeeds on every push, so documentation builds keep
+  # being verified even with deployment off. Re-enable by uncommenting
+  # this job once Pages is turned on in Settings.
+  #
+  # deploy:
+  #   name: Deploy to GitHub Pages
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   environment:
+  #     name: github-pages
+  #     url: ${{ steps.deployment.outputs.page_url }}
+  #   steps:
+  #     - name: Deploy to GitHub Pages
+  #       id: deployment
+  #       uses: actions/deploy-pages@v4
