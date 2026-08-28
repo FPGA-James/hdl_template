@@ -1,6 +1,6 @@
 # HDL Template
 
-A GitHub template repository for FPGA/ASIC projects supporting VHDL and SystemVerilog side-by-side, with a fully wired build system from day one.
+A GitHub template repository for FPGA projects supporting VHDL and SystemVerilog side-by-side, with a fully wired build system from day one.
 
 Click **Use this template** to create your own repository, then run `make init NAME=<project>` to rename everything.
 
