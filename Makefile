@@ -7,7 +7,10 @@
 # Override with: make sim OSS_CAD_SUITE=/path/to/oss-cad-suite
 OSS_CAD_SUITE ?= $(HOME)/tools/oss-cad-suite
 # Mirror what `source environment` does: extend PATH and set tool prefixes.
-export PATH         := $(OSS_CAD_SUITE)/bin:$(OSS_CAD_SUITE)/py3bin:$(PATH)
+# .venv/bin goes first so cocotb's own sub-Makefiles can find cocotb-config
+# via bare PATH lookup (tb/cocotb/Makefile shells out to it directly) --
+# $(PYTHON) alone only covers explicit python invocations, not this.
+export PATH         := .venv/bin:$(OSS_CAD_SUITE)/bin:$(OSS_CAD_SUITE)/py3bin:$(PATH)
 export GHDL_PREFIX  ?= $(OSS_CAD_SUITE)/lib/ghdl
 export VERILATOR_ROOT ?= $(OSS_CAD_SUITE)/share/verilator
 
