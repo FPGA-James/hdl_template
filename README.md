@@ -1,8 +1,8 @@
 # HDL Template
 
-A GitHub template repository for FPGA/ASIC projects supporting VHDL and SystemVerilog side-by-side, with a fully wired build system from day one.
+An HDL project starter for FPGA/ASIC projects supporting VHDL and SystemVerilog side-by-side, with a fully wired build system from day one.
 
-Click **Use this template** to create your own repository, then run `make init NAME=<project>` to rename everything.
+**Fork this repository** to start your own project, then run `make init NAME=<project>` to rename everything. Forking (rather than copying via "Use this template") keeps a real git relationship back to this repo, so you can pull in template fixes and improvements later — see [Staying up to date](#staying-up-to-date-with-this-template) below.
 
 ---
 
@@ -26,15 +26,15 @@ Click **Use this template** to create your own repository, then run `make init N
 
 ## Getting started
 
-### 1 — Create your repository
+### 1 — Fork the repository
 
-Click **Use this template → Create a new repository** on GitHub.
+Click **Fork** on GitHub (top right of the repo page) to create your own copy under your account or organisation — you can rename it away from `hdl_template` at this point if you already know your project's name.
 
-Clone your new repo, fetching the [HDLAutoDoc](https://github.com/FPGA-James/HDLAutoDoc) submodule along with it:
+Clone your fork, fetching the [HDLAutoDoc](https://github.com/FPGA-James/HDLAutoDoc) submodule along with it:
 
 ```bash
-git clone --recurse-submodules https://github.com/<you>/<your-repo>.git
-cd <your-repo>
+git clone --recurse-submodules https://github.com/<you>/<your-fork>.git
+cd <your-fork>
 ```
 
 Already cloned without `--recurse-submodules`? Run `git submodule update --init --recursive` instead. The submodule provides the documentation-generation scripts (`make html`, `make pdf`, `make test-autodoc`) — it's not needed for `make init`, `make sim`, `make synth`, or `make impl`.
@@ -92,6 +92,20 @@ make sim-native TOPLEVEL_HDL=sv                         # SV, no framework — V
 ```
 
 `sim-native` needs [NVC](https://www.nickg.me.uk/nvc/) for the VHDL path (`brew install nvc`) — it's not part of OSS CAD Suite.
+
+---
+
+## Staying up to date with this template
+
+Because your project is a **fork**, not a disconnected copy, you can pull in template fixes and improvements after `make init` has already run — useful given this template's own CI/build infrastructure keeps getting real bug fixes. Add this repository as a second remote once, then merge from it whenever you want:
+
+```bash
+git remote add upstream https://github.com/FPGA-James/hdl_template.git
+git fetch upstream
+git merge upstream/main --allow-unrelated-histories   # first time only, if your history has diverged post-init
+```
+
+Expect conflicts on anything `make init` rewrote (`<<NAME>>` substitutions, renamed files) — resolve those in favour of your own project's names, taking the upstream side for everything else (Makefile logic, CI workflows, scripts). This works best for infrastructure fixes (CI, `scripts/`, `Makefile`); merging changes to `src/`/`tb/` example RTL is rarely useful once you've replaced it with your own design.
 
 ---
 
