@@ -28,9 +28,16 @@ An HDL project starter for FPGA projects supporting VHDL and SystemVerilog side-
 
 ### 1 — Fork the repository
 
-Click **Fork** on GitHub (top right of the repo page) to create your own copy under your account or organisation — you can rename it away from `hdl_template` at this point if you already know your project's name.
+**Via the [GitHub CLI](https://cli.github.com/)** (`gh`) — forks, clones, and sets up the `upstream` remote in one step:
 
-Clone your fork, fetching the [HDLAutoDoc](https://github.com/FPGA-James/HDLAutoDoc) submodule along with it:
+```bash
+gh repo fork FPGA-James/hdl_template --clone -- --recurse-submodules
+cd hdl_template
+```
+
+Add `--fork-name <your-project>` to rename the fork at creation time (`cd <your-project>` instead, then). `gh` automatically points `origin` at your new fork and `upstream` at this repo — the exact setup [Staying up to date](#staying-up-to-date-with-this-template) below asks you to do manually, so you can skip that step if you use this command.
+
+**Via the GitHub web UI** — click **Fork** (top right of the repo page) to create your own copy under your account or organisation, renaming it away from `hdl_template` there if you like, then clone it:
 
 ```bash
 git clone --recurse-submodules https://github.com/<you>/<your-fork>.git
@@ -97,7 +104,7 @@ make sim-native TOPLEVEL_HDL=sv                         # SV, no framework — V
 
 ## Staying up to date with this template
 
-Because your project is a **fork**, not a disconnected copy, you can pull in template fixes and improvements after `make init` has already run — useful given this template's own CI/build infrastructure keeps getting real bug fixes. Add this repository as a second remote once, then merge from it whenever you want:
+Because your project is a **fork**, not a disconnected copy, you can pull in template fixes and improvements after `make init` has already run — useful given this template's own CI/build infrastructure keeps getting real bug fixes. If you forked via `gh repo fork` above, the `upstream` remote already points here — skip straight to `git fetch upstream`. Otherwise, add it once:
 
 ```bash
 git remote add upstream https://github.com/FPGA-James/hdl_template.git
