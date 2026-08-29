@@ -1,6 +1,6 @@
 # HDL Template
 
-An HDL project starter for FPGA/ASIC projects supporting VHDL and SystemVerilog side-by-side, with a fully wired build system from day one.
+An HDL project starter for FPGA projects supporting VHDL and SystemVerilog side-by-side, with a fully wired build system from day one.
 
 **Fork this repository** to start your own project, then run `make init NAME=<project>` to rename everything. Forking (rather than copying via "Use this template") keeps a real git relationship back to this repo, so you can pull in template fixes and improvements later — see [Staying up to date](#staying-up-to-date-with-this-template) below.
 
