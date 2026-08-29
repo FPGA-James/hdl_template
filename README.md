@@ -31,11 +31,11 @@ An HDL project starter for FPGA projects supporting VHDL and SystemVerilog side-
 **Via the [GitHub CLI](https://cli.github.com/)** (`gh`) — forks, clones, and sets up the `upstream` remote in one step:
 
 ```bash
-gh repo fork FPGA-James/hdl_template --clone -- --recurse-submodules
-cd hdl_template
+gh repo fork FPGA-James/hdl_template --fork-name <your-project> --clone -- --recurse-submodules
+cd <your-project>
 ```
 
-Add `--fork-name <your-project>` to rename the fork at creation time (`cd <your-project>` instead, then). `gh` automatically points `origin` at your new fork and `upstream` at this repo — the exact setup [Staying up to date](#staying-up-to-date-with-this-template) below asks you to do manually, so you can skip that step if you use this command.
+Drop `--fork-name <your-project>` (and clone into `hdl_template` instead) to keep the fork's name unchanged. `gh` automatically points `origin` at your new fork and `upstream` at this repo — the exact setup [Staying up to date](#staying-up-to-date-with-this-template) below asks you to do manually, so you can skip that step if you use this command.
 
 **Via the GitHub web UI** — click **Fork** (top right of the repo page) to create your own copy under your account or organisation, renaming it away from `hdl_template` there if you like, then clone it:
 
