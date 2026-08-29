@@ -1,3 +1,29 @@
+-- =============================================================================
+-- Company      : <company>
+--
+-- Designer     : <name>
+--
+-- Filename     : <<NAME>>_pkg.vhd
+--
+-- Purpose      : Shared constants and types for the <<NAME>> design hierarchy.
+--
+-- Tools        : <simulators/frameworks used to verify this, e.g. GHDL + VUnit>
+--
+-- References   :
+--   - <datasheet / spec / paper / issue link>
+--
+-- Date Created : YYYY-MM-DD
+--
+-- Date Updated : YYYY-MM-DD
+-- =============================================================================
+--
+-- Revision History
+-- =============================================================================
+-- Date        Author          Description
+-- ----------  --------------  --------------------------------------------
+-- YYYY-MM-DD  <name>          Initial creation
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;

@@ -1,3 +1,31 @@
+-- =============================================================================
+-- Company      : <company>
+--
+-- Designer     : <name>
+--
+-- Filename     : <<NAME>>_core.vhd
+--
+-- Purpose      : Parameterisable pulse counter. Counts input pulses when
+--                enabled and reports the running total via the status
+--                register interface.
+--
+-- Tools        : <simulators/frameworks used to verify this, e.g. GHDL + VUnit>
+--
+-- References   :
+--   - <datasheet / spec / paper / issue link>
+--
+-- Date Created : YYYY-MM-DD
+--
+-- Date Updated : YYYY-MM-DD
+-- =============================================================================
+--
+-- Revision History
+-- =============================================================================
+-- Date        Author          Description
+-- ----------  --------------  --------------------------------------------
+-- YYYY-MM-DD  <name>          Initial creation
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;

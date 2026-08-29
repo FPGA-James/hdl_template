@@ -1,3 +1,30 @@
+// =============================================================================
+// Company      : <company>
+//
+// Designer     : <name>
+//
+// Filename     : <<NAME>>_core.sv
+//
+// Purpose      : Parameterisable pulse counter (SystemVerilog). Port
+//                interface is identical to the VHDL <<NAME>>_core entity.
+//
+// Tools        : <simulators/frameworks used to verify this, e.g. Verilator + cocotb>
+//
+// References   :
+//   - <datasheet / spec / paper / issue link>
+//
+// Date Created : YYYY-MM-DD
+//
+// Date Updated : YYYY-MM-DD
+// =============================================================================
+//
+// Revision History
+// =============================================================================
+// Date        Author          Description
+// ----------  --------------  --------------------------------------------
+// YYYY-MM-DD  <name>          Initial creation
+// =============================================================================
+
 // <<NAME>> core (SystemVerilog).
 //
 // Parameterisable pulse counter. Port interface is identical to the VHDL
