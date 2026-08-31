@@ -1,3 +1,18 @@
 [submodule "submodules/HDLAutoDoc"]
 	path = submodules/HDLAutoDoc
 	url = https://github.com/FPGA-James/HDLAutoDoc.git
+[submodule "submodules/axi"]
+	path = submodules/axi
+	url = https://github.com/pulp-platform/axi.git
+[submodule "submodules/common_cells"]
+	path = submodules/common_cells
+	url = https://github.com/pulp-platform/common_cells.git
+[submodule "submodules/common_verification"]
+	path = submodules/common_verification
+	url = https://github.com/pulp-platform/common_verification.git
+[submodule "submodules/Interfaces"]
+	path = submodules/Interfaces
+	url = https://github.com/FPGA-James/Interfaces.git
+[submodule "submodules/hooks"]
+	path = submodules/hooks
+	url = https://github.com/FPGA-James/hooks.git
