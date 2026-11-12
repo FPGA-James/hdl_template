@@ -161,7 +161,7 @@ def parse_sv_ports(core_file: Path) -> dict[str, Port]:
 #   read-back to work. Typical use: a pure scratch register to verify bus
 #   read/write access.
 FIXED_VALUE_REGISTERS: dict[str, int] = {
-    "module_id": 0x41455331,  # ASCII "AES1" -- recognizable at a glance in a memory dump
+    "module_id": 0x00000000,  # set per project, e.g. four ASCII characters -- recognizable at a glance in a memory dump
     "version": 0x00010000,  # packed [31:24] reserved, [23:16] major, [15:8] minor, [7:0] patch = v1.0.0
 }
 NO_CORE_WIRING_REGISTERS: set[str] = {

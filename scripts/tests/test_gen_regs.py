@@ -171,7 +171,7 @@ def test_build_field_mappings_skips_fixed_value_registers(tmp_path, monkeypatch)
     -- it's driven by a compile-time constant in <name>_top, not <<NAME>>_core."""
     from hdl_registers.parser.toml import from_toml
 
-    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {"module_id": 0x41455331})
+    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {"module_id": 0x12345678})
     monkeypatch.setattr(gen_regs, "NO_CORE_WIRING_REGISTERS", set())
 
     toml_file = tmp_path / "regs.toml"
@@ -184,27 +184,27 @@ def test_build_field_mappings_skips_fixed_value_registers(tmp_path, monkeypatch)
 def test_build_fixed_value_lines_sv(tmp_path, monkeypatch):
     from hdl_registers.parser.toml import from_toml
 
-    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {"module_id": 0x41455331})
+    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {"module_id": 0x12345678})
 
     toml_file = tmp_path / "regs.toml"
     toml_file.write_text('[module_id]\nmode = "r"\n[module_id.value]\ntype = "bit_vector"\nwidth = 32\n')
     register_list = from_toml(name="demo", toml_file=toml_file)
 
     lines = gen_regs.build_fixed_value_lines(register_list, "sv")
-    assert lines == ["    assign hwif_in.module_id.value.next = 32'h41455331;"]
+    assert lines == ["    assign hwif_in.module_id.value.next = 32'h12345678;"]
 
 
 def test_build_fixed_value_lines_vhdl(tmp_path, monkeypatch):
     from hdl_registers.parser.toml import from_toml
 
-    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {"module_id": 0x41455331})
+    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {"module_id": 0x12345678})
 
     toml_file = tmp_path / "regs.toml"
     toml_file.write_text('[module_id]\nmode = "r"\n[module_id.value]\ntype = "bit_vector"\nwidth = 32\n')
     register_list = from_toml(name="demo", toml_file=toml_file)
 
     lines = gen_regs.build_fixed_value_lines(register_list, "vhdl")
-    assert lines == ["    regs_up.module_id.value <= to_unsigned(16#41455331#, 32);"]
+    assert lines == ["    regs_up.module_id.value <= to_unsigned(16#12345678#, 32);"]
 
 
 def test_build_fixed_value_lines_skips_registers_not_present(tmp_path, monkeypatch):
@@ -380,18 +380,18 @@ def test_render_sv_wiring_block_includes_fixed_value_lines(demo_register_list):
     autogen region alongside the core instantiation, not silently dropped."""
     mappings = gen_regs.build_field_mappings(demo_register_list)
     block = gen_regs.render_sv_wiring_block(
-        "demo", mappings, {}, fixed_value_lines=["    assign hwif_in.module_id.value.next = 32'h41455331;"]
+        "demo", mappings, {}, fixed_value_lines=["    assign hwif_in.module_id.value.next = 32'h12345678;"]
     )
-    assert "assign hwif_in.module_id.value.next = 32'h41455331;" in block
+    assert "assign hwif_in.module_id.value.next = 32'h12345678;" in block
     assert "demo_core u_core (" in block
 
 
 def test_render_vhdl_wiring_block_includes_fixed_value_lines(demo_register_list):
     mappings = gen_regs.build_field_mappings(demo_register_list)
     block = gen_regs.render_vhdl_wiring_block(
-        "demo", mappings, {}, fixed_value_lines=["    regs_up.module_id.value <= to_unsigned(16#41455331#, 32);"]
+        "demo", mappings, {}, fixed_value_lines=["    regs_up.module_id.value <= to_unsigned(16#12345678#, 32);"]
     )
-    assert "regs_up.module_id.value <= to_unsigned(16#41455331#, 32);" in block
+    assert "regs_up.module_id.value <= to_unsigned(16#12345678#, 32);" in block
     assert "u_core : entity work.demo_core" in block
 
 
