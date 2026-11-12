@@ -14,8 +14,11 @@ SYNTH_RDIR  = $(AUTODOC_REPORTS_DIR)/yosys
 synth: synth-$(SYNTH_TOOL) ## Synthesise  [SYNTH_TOOL=yosys  TOPLEVEL_HDL=vhdl|sv]
 	@:
 
-# Help entry only; the recipe is in scripts/mk/tools/yosys.mk.
-synth-gui: synth ## Open Yosys schematic viewer for the last synthesis  [TOPLEVEL_HDL=vhdl|sv]
+synth-gui: synth-gui-$(SYNTH_TOOL) ## Open the schematic viewer for the last synthesis  [SYNTH_TOOL=yosys  TOPLEVEL_HDL=vhdl|sv]
+	@:
+
+synth-gui-%:
+	$(call unknown-tool,synth-gui,SYNTH_TOOL,$(SYNTH_TOOLS))
 
 synth-%:
 	$(call unknown-tool,synth,SYNTH_TOOL,$(SYNTH_TOOLS))

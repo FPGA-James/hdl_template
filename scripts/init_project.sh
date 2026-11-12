@@ -108,20 +108,18 @@ for subdir in vhdl sv; do
             -name "*.yml" -o -name "*.yaml" -o -name "*.core" \
             -o -name "*.md"  -o -name "*.rst" -o -name "*.py"  \
             -o -name "*.sh"  -o -name "*.f"   -o -name "Makefile" \
+            -o -name "*.ys"  -o -name "*.mk" \
         \) -print0 2>/dev/null)
 done
 
 echo ""
 
-# ── SV projects: switch the Makefile's language defaults ───────────────────────
+# ── SV projects: switch the Makefile's language default ────────────────────────
 # So a bare `make sim|lint|synth|impl|html` takes the SV path without TOPLEVEL_HDL=sv
-# on every command. A VHDL project keeps the template defaults (vunit/ghdl/vhdl).
+# on every command (FRAMEWORK and SIM follow TOPLEVEL_HDL in the Makefile).
 if [[ "$TOPLEVEL_HDL" == "sv" && -f Makefile ]]; then
-    sed "${SED_I[@]}" \
-        -e 's/^FRAMEWORK    ?= vunit/FRAMEWORK    ?= cocotb/' \
-        -e 's/^SIM          ?= ghdl/SIM          ?= verilator/' \
-        -e 's/^TOPLEVEL_HDL ?= vhdl/TOPLEVEL_HDL ?= sv/' Makefile
-    echo "  Makefile defaults set for SystemVerilog: FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv"
+    sed "${SED_I[@]}" -e 's/^TOPLEVEL_HDL ?= vhdl/TOPLEVEL_HDL ?= sv/' Makefile
+    echo "  Makefile default set for SystemVerilog: TOPLEVEL_HDL=sv"
     echo ""
 fi
 

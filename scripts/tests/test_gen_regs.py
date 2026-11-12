@@ -558,3 +558,36 @@ def test_no_register_names_are_special_by_default():
     # adding names to these tables.
     assert gen_regs.FIXED_VALUE_REGISTERS == {}
     assert gen_regs.NO_CORE_WIRING_REGISTERS == set()
+
+
+# ── _register_sv_decode ──────────────────────────────────────────────────────
+# Canned PeakRDL-regblock output: just the pieces the rewrite touches.
+_REGBLOCK_DECODE = (
+    "    decoded_reg_strb_t decoded_reg_strb;\n"
+    "    always_comb begin\n"
+    "        decoded_reg_strb.conf = cpuif_req_masked & (cpuif_addr == 4'h0);\n"
+    "        decoded_reg_strb.status = cpuif_req_masked & (cpuif_addr == 4'h8);\n"
+    "    end\n"
+) + gen_regs._SV_DECODE_PASS_DOWN
+
+
+def test_register_sv_decode_registers_the_strobes_and_the_request():
+    out = gen_regs._register_sv_decode(_REGBLOCK_DECODE)
+    # The combinational decode now drives *_c; the field logic sees the registered copy.
+    assert "decoded_reg_strb_t decoded_reg_strb_c, decoded_reg_strb;" in out
+    assert "decoded_reg_strb_c.conf = " in out
+    assert "decoded_reg_strb_c.status = " in out
+    assert "decoded_reg_strb.conf = " not in out
+    assert "decoded_reg_strb <= decoded_reg_strb_c;" in out
+    # The pass-down assigns became registered copies.
+    assert "assign decoded_addr = cpuif_addr;" not in out
+    assert "decoded_req <= cpuif_req_masked;" in out
+    assert "decoded_wr_data <= cpuif_wr_data;" in out
+
+
+def test_register_sv_decode_raises_when_regblock_output_changes():
+    with pytest.raises(ValueError, match="decode stage not found"):
+        gen_regs._register_sv_decode("module unrelated; endmodule\n")
+    no_assignments = "    decoded_reg_strb_t decoded_reg_strb;\n" + gen_regs._SV_DECODE_PASS_DOWN
+    with pytest.raises(ValueError, match="no decoded_reg_strb assignments"):
+        gen_regs._register_sv_decode(no_assignments)

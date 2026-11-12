@@ -15,11 +15,15 @@ IMPL_TOOLS += nextpnr
 IMPL_FAMILY     ?= ecp5
 
 # Device and package — must match your physical FPGA.
-# ecp5 (default): IMPL_DEVICE=25k  IMPL_PACKAGE=CABGA256  IMPL_SPEED=8   (LFE5U-25F, fastest grade)
-# ice40 examples:  IMPL_DEVICE=hx8k   IMPL_PACKAGE=ct256   (untested with this template)
-#                  IMPL_DEVICE=hx1k   IMPL_PACKAGE=tq144
-IMPL_DEVICE     ?= 25k
-IMPL_PACKAGE    ?= CABGA256
+# Defaults follow IMPL_FAMILY: ecp5 -> 25k / CABGA256 / speed 8 (LFE5U-25F, fastest grade),
+# ice40 -> hx8k / ct256 (other ice40 parts: IMPL_DEVICE=hx1k IMPL_PACKAGE=tq144).
+# machxo2 has no default: pass IMPL_DEVICE and IMPL_PACKAGE.
+IMPL_DEVICE_ecp5    = 25k
+IMPL_PACKAGE_ecp5   = CABGA256
+IMPL_DEVICE_ice40   = hx8k
+IMPL_PACKAGE_ice40  = ct256
+IMPL_DEVICE     ?= $(IMPL_DEVICE_$(IMPL_FAMILY))
+IMPL_PACKAGE    ?= $(IMPL_PACKAGE_$(IMPL_FAMILY))
 # ECP5 speed grade (6, 7 or 8; 8 is the fastest). Ignored for other families.
 IMPL_SPEED      ?= 8
 

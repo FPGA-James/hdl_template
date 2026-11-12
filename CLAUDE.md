@@ -39,7 +39,7 @@ scripts/mk/tools/*.mk   yosys, nextpnr, nvc, verilator, ghdl (lint-vhdl), icestu
 
 **Adding a tool backend (e.g. Questa, Vivado):** drop a file in `scripts/mk/tools/<tool>.mk` that appends itself to the registry for the flows it provides (`SYNTH_TOOLS += vivado`, `IMPL_TOOLS += vivado`, `SIM_NATIVE_TOOLS += questa`) and defines the matching `<flow>-<tool>` targets (`synth-vivado`, `impl-vivado` / `impl-gui-vivado`, `sim-native-questa`); select it with `SYNTH_TOOL=vivado` / `IMPL_TOOL=vivado` / `NATIVE_SIM=questa`. Nothing else needs editing — the dispatchers use `$(wildcard scripts/mk/tools/*.mk)` and an unregistered tool gets an error listing the registered ones (`unknown-tool` macro in `scripts/mk/core.mk`). Tool-specific variables (family/part/constraint) belong in the tool's own file; vendor flows are best written as Tcl/DO scripts under `scripts/<tool>/` that the `.mk` file launches. cocotb and VUnit pick their simulator from `SIM` / `VUNIT_SIMULATOR` (see `tb/cocotb/Makefile`, `tb/vunit/run.py`) — those two files need a Questa branch too. Bender can emit tool-specific file lists directly (`bender script vsim`, `bender script vivado`).
 
-Conventions that keep the include-based layout working: help entries (`## description`) for dispatched/aliased targets live in the flow file as recipe-less "stubs" (the recipe is in the tool file), and any alias target with no real recipe gets an explicit `@:` recipe so make does not try the `<flow>-%` fallback rule on it. `HDL_KIND` is the normalised language key (`sv` or `vhdl`) used for per-language variables (`YOSYS_READ_$(HDL_KIND)`). The template defaults are `FRAMEWORK=vunit SIM=ghdl TOPLEVEL_HDL=vhdl`; `make init ... TOPLEVEL_HDL=sv` rewrites them in the project's `Makefile` to `cocotb`/`verilator`/`sv`, so a bare `make sim|lint|synth|impl|html` takes the project's language path. `lint-sv` and the sim targets depend on `regs`.
+Conventions that keep the include-based layout working: help entries (`## description`) for dispatched/aliased targets live in the flow file as recipe-less "stubs" (the recipe is in the tool file), and any alias target with no real recipe gets an explicit `@:` recipe so make does not try the `<flow>-%` fallback rule on it. `HDL_KIND` is the normalised language key (`sv` or `vhdl`) used for per-language variables (`YOSYS_READ_$(HDL_KIND)`). `TOPLEVEL_HDL` (default `vhdl`) is the language switch: `FRAMEWORK` (`vunit` / `cocotb` for SV) and `SIM` (`ghdl` / `verilator` for SV) default from it, and `make init ... TOPLEVEL_HDL=sv` rewrites its default in the project's `Makefile` to `sv`, so a bare `make sim|lint|synth|impl|html` takes the project's language path. `lint-sv` and the sim targets depend on `regs`.
 
 ## Initial Setup (one-time)
 
@@ -68,7 +68,7 @@ make sim-native TOPLEVEL_HDL=sv                           # Native SV via Verila
 make sim-cpp TOPLEVEL_HDL=sv                              # C++ bench via Verilator --cc --exe --build
 
 # Single VUnit test
-VUNIT_SIMULATOR=ghdl .venv/bin/python tb/vunit/run.py -v "tb_lib.NAME_tb.test_count_up"
+VUNIT_SIMULATOR=ghdl .venv/bin/python tb/vunit/run.py -v "tb_lib.<<NAME>>_tb.test_count_up"
 
 # Synthesis
 make synth                  # VHDL via ghdl-yosys-plugin → Xilinx 7-series
@@ -204,7 +204,7 @@ The generated AXI-Lite entity requires the `hdl-modules` library (fetched via `m
 
 For SystemVerilog projects, `make regs` instead generates `out/regs/sv/<name>_register_file_axi_lite.sv` and `out/regs/sv/<name>_register_file_axi_lite_pkg.sv` via PeakRDL-regblock (through `hdl_registers`' SystemVerilog generator, `flatten_axi_lite=True`), plus `out/regs/sv/<name>_regs_addr_pkg.sv` — a small lowercase-named localparam package: one per register's byte address, and `<name>_addr_width`, the bit width of the register file's address ports (copied from the generated package's uppercase `MIN_ADDR_WIDTH`, which `<<NAME>>` template substitution cannot produce). `scripts/gen_regs.py` (`_register_sv_decode`) also registers PeakRDL-regblock's decode stage (strobes, request, address, write data) before the field logic, which shortens the request → decode → load-enable critical path; reads and writes each gain one cycle and stay ordered, the register map and ports are unchanged.
 
-`make regs` also auto-wires each register field to a matching `<name>_core` port, rewriting only the marker-delimited region(s) inside `<name>_top` (VHDL: `-- BEGIN/END AUTOGEN REGISTER SIGNALS` plus `-- BEGIN/END AUTOGEN REGISTERS`; SV: `// BEGIN/END AUTOGEN REGISTERS`). Field leaf names must be unique across the whole register map (each resolves to a distinct `<name>_core` port). Interface-typed core ports (e.g. a stream) are connected by name to an identically named top port.
+`make regs` also auto-wires each register field to a matching `<name>_core` port, rewriting only the marker-delimited region(s) inside `<name>_top` (VHDL: `-- BEGIN/END AUTOGEN REGISTER SIGNALS` plus `-- BEGIN/END AUTOGEN REGISTERS`; SV: `// BEGIN/END AUTOGEN REGISTERS`). Field leaf names must be unique across the whole register map (each resolves to a distinct `<name>_core` port). Interface-typed core ports (e.g. a stream) are connected by name to an identically named top port. The SV top slices `s_axil` addresses to `<name>_addr_width` bits, so the `axil_if` instances (testbench wrappers) need `ADDR_W` at least that wide: the default 8 covers 64 registers, a larger map needs a larger `ADDR_W` where `axil_if` is instantiated.
 
 ### Documentation Pipeline
 
@@ -244,7 +244,7 @@ Generated Testbenches/Build/Coverage pages (`docs/testbenches/`, `docs/synthesis
 1. Moves `src/<hdl>/` files to `src/`, removes both `src/vhdl/` and `src/sv/`, and normalises `src/vhdl/` / `src/sv/` path references to `src/` across all config and doc files.
 2. Replaces all `<<NAME>>` in file contents with `<name>`.
 3. Renames all files whose name *begins* with `NAME_` (extensions: vhd sv v py toml ys xdc lpf rst cpp h hpp) to `<name>_*.ext`. Directories are never renamed, so directory names must be neutral. Names that merely *contain* `NAME` keep it: `tb/cocotb/test_NAME.py`, `tb/cocotb/pyuvm_tb/test_NAME_*.py` and `synth/constraints/NAME.xdc` (the cocotb Makefile refers to `test_NAME`, so the files are stable across projects).
-4. For `TOPLEVEL_HDL=sv`, rewrites the Makefile's `FRAMEWORK`/`SIM`/`TOPLEVEL_HDL` defaults (see Makefile Layout).
+4. For `TOPLEVEL_HDL=sv`, rewrites the Makefile's `TOPLEVEL_HDL` default to `sv` (see Makefile Layout).
 
 After `make init`, `src/` is flat (no language subdirectories), no `<<NAME>>` placeholder remains and no file name begins with `NAME_`, and both Bender targets (`rtl_vhdl`, `rtl_sv`) reference `src/` — only the chosen language's files will exist there. Re-running with a different name is a no-op once the placeholders are gone.
 
@@ -258,7 +258,7 @@ After `make init`, `src/` is flat (no language subdirectories), no `<<NAME>>` pl
 - `docs/conf.py` — thin Sphinx wrapper around the tool's shared `conf.py`
 - `submodules/HDLAutoDoc` — git submodule; source of the HDL AutoDoc scripts and `autodoc.mk` (`scripts/gen_regs.py` and `docs/conf.py` remain project-owned)
 - `vsg.yml` — VHDL Style Guide linter rules (`rule:` is the key vsg reads; `make lint-vhdl` invokes vsg through its `main()`, since `python -m vsg` is a silent no-op)
-- `.github/workflows/ci.yml` — CI matrix (lint, sim×4, synth, test-autodoc); includes a `regs` job that regenerates and diffs register files to catch uncommitted drift, and a `smoke-test` job (vhdl/sv matrix) that runs `scripts/smoke_test.sh` — the only job that exercises the Makefile *after* `make init`, which is the state real users actually build against
+- `.github/workflows/ci.yml` — CI (`regs`, `test-autodoc`, `smoke-test`; the raw-checkout lint/sim/synth jobs are commented out, see README); includes a `regs` job that regenerates and diffs register files to catch uncommitted drift, and a `smoke-test` job (vhdl/sv matrix) that runs `scripts/smoke_test.sh` — the only job that exercises the Makefile *after* `make init`, which is the state real users actually build against
 - `scripts/smoke_test.sh` — copies the working tree into an isolated temp dir per language, runs `make init` (name `my_ip2`), checks for leftover placeholders, then walks `regs`/`lsp`/`lint`/every testbench flow (including pyuvm)/`synth`/`impl`/`html`/`coverage`/`test-autodoc`/the generator tests. Runs every step regardless of earlier failures and prints a full pass/fail summary (`scripts/smoke_test.sh [vhdl|sv]`, `KEEP=1` to keep the temp dirs)
 - `.github/workflows/docs.yml` — Sphinx → GitHub Pages deployment (main branch only)
 - `.python-version` — pins Python 3.13 for venv and CI

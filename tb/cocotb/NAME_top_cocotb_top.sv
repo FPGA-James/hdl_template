@@ -36,7 +36,9 @@
 //
 // Flat port names (s_axi_*) are identical to the VHDL wrapper's, so the same
 // cocotbext-axi AxiLiteBus.from_prefix(dut, "s_axi") works for both languages.
-// ADDR_W=8/DATA_W=32 match axil_if's defaults.
+// ADDR_W=8/DATA_W=32 match axil_if's defaults. A register map needing more than 8 address
+// bits (over 64 registers) needs a larger ADDR_W here, in tb/cpp/NAME_top_cpp_flat.sv and in
+// tb/native/sv/NAME_tb.sv, and wider s_axi_*addr ports.
 module <<NAME>>_top_cocotb_top (
     input  logic        clk,
     input  logic        rst_n,

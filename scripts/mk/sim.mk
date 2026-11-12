@@ -37,7 +37,7 @@ sim-cocotb: regs ## Run cocotb testbench  [SIM=  TOPLEVEL_HDL=vhdl|sv  PYUVM=1 f
 	@$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL) BENDER=$(BENDER) $(if $(PYUVM),PYUVM=$(PYUVM))
 
 # Native bench: dispatch to the selected tool's backend.
-sim-native: regs sim-native-$(NATIVE_SIM) ## Run the native (framework-less) testbench  [NATIVE_SIM=nvc|verilator  TOPLEVEL_HDL=vhdl|sv]
+sim-native: sim-native-$(NATIVE_SIM) ## Run the native (framework-less) testbench  [NATIVE_SIM=nvc|verilator  TOPLEVEL_HDL=vhdl|sv]
 	@:
 
 # Language-named shortcuts for the two tools that ship with the template.

@@ -5,7 +5,7 @@
 # implementation flow (scripts/mk/tools/nextpnr.mk) to map the design to a target.
 # =============================================================================
 SYNTH_TOOLS += yosys
-.PHONY: synth-yosys synth-gui
+.PHONY: synth-yosys synth-gui-yosys
 
 # Yosys front end per language. YOSYS_TOP is the unit the VHDL front end
 # elaborates; synth-yosys sets it to TOPLEVEL, the nextpnr flow to IMPL_TOPLEVEL.
@@ -39,8 +39,8 @@ synth-yosys: regs
 	@printf "\n\033[32m  ✓\033[0m Netlist:  \033[36mout/synth/$(TOPLEVEL)_$(HDL_KIND).edif\033[0m\n"
 	@printf "    Reports: \033[36m$(SYNTH_RDIR)/\033[0m (yosys.log stat.txt check.txt netlist.json)\n\n"
 
-# Opens the JSON netlist written by synth-yosys (the target is declared in scripts/mk/synth.mk).
-synth-gui:
+# Opens the JSON netlist written by synth-yosys (dispatched from synth-gui in scripts/mk/synth.mk).
+synth-gui-yosys: synth-yosys
 	@printf "\n\033[1m  Opening Yosys schematic viewer...\033[0m\n\n"
 	@$(OSS_CAD_SUITE)/bin/yosys \
 	  -p "read_json $(SYNTH_RDIR)/netlist.json; show $(TOPLEVEL)"

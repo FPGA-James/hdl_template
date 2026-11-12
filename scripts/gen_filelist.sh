@@ -110,6 +110,7 @@ else
     # Project SV sources in compilation order (package → core → top).
     # top listed last -- see the "Emitted BEFORE rtl_vhdl" comment above.
     for f in "$REPO_ROOT"/src/sv/<<NAME>>_pkg.sv \
+              "$REPO_ROOT"/src/sv/axil_if.sv \
               "$REPO_ROOT"/src/sv/<<NAME>>_core.sv \
               "$REPO_ROOT"/src/sv/<<NAME>>_top.sv; do
         [ -f "$f" ] && echo "$f"

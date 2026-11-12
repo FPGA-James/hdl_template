@@ -86,7 +86,7 @@ Reads `regs/<name>_regs.toml` and writes to `out/regs/vhdl/` (VHDL projects) or 
 
 Naming convention (strict, no exceptions): a register field named `<leaf>` must have a matching `<name>_core` port named `<leaf>_i` (for `w`/`r_w` mode fields) or `<leaf>_o` (for `r` mode fields), and no two fields may share a leaf name (each must resolve to a distinct port). A `<name>_core` port that isn't matched by any field must have an identically-named port on `<name>_top` to pass through (e.g. `clk`, `rst_n`) — otherwise `make regs` fails, naming the exact field or port at fault.
 
-The generated SV register file needs light post-processing to stay synthesizable on free/OSS Yosys (PeakRDL-regblock's output isn't otherwise accepted by Yosys's SV frontend) — `make regs` handles this automatically. See `CLAUDE.md`'s "SV register-file synthesizability" note for details and one known residual gap (Icarus-based cocotb simulation, untested).
+The generated SV register file needs light post-processing to stay synthesizable on free/OSS Yosys (PeakRDL-regblock's output isn't otherwise accepted by Yosys's SV frontend) — `make regs` handles this automatically. See `CLAUDE.md`'s "SV register-file synthesizability" note for details and why Icarus is not supported for SystemVerilog.
 
 ### 6 — Run the testbench
 
@@ -148,7 +148,7 @@ make sim-cpp         Run the C++ testbench directly with Verilator --cc --exe --
 make lint            VHDL: GHDL analysis + vsg  |  SV: Verilator --lint-only
 make lint-vhdl       VHDL lint only
 make lint-sv         SV lint only
-make synth           Yosys XC7 synthesis; reports in out/reports/synth/
+make synth           Yosys XC7 synthesis; reports in out/reports/yosys/
 make synth-gui       Open Yosys schematic viewer for the synthesised netlist
 make impl            nextpnr place-and-route (ECP5 default) + timing check; bitstream in out/impl/
 make impl-gui        Open nextpnr interactive placement/routing GUI
@@ -169,9 +169,9 @@ make verible-ls      Generate verible.filelist for Verible
 
 | Variable | Default | Options |
 |---|---|---|
-| `FRAMEWORK` | `vunit` | `vunit` \| `cocotb` \| `native` |
+| `FRAMEWORK` | `vunit` (`cocotb` for SV) | `vunit` \| `cocotb` \| `native` |
 | `PYUVM` | `0` | `1` runs the pyuvm bench instead of `test_NAME.py` (cocotb only) |
-| `SIM` | `ghdl` | `ghdl` \| `verilator` (cocotb only) |
+| `SIM` | `ghdl` (`verilator` for SV) | `ghdl` \| `verilator` (cocotb only) |
 | `TOPLEVEL_HDL` | `vhdl` | `vhdl` \| `sv` |
 | `SYNTH_TOOL` | `yosys` | any backend registered in `scripts/mk/tools/` |
 | `IMPL_TOOL` | `nextpnr` | any registered backend |

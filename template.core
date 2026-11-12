@@ -66,7 +66,7 @@ targets:
       - rtl_sv
       - gen_sv
     toplevel: <<NAME>>_top
-    default_tool: icarus
+    default_tool: verilator
 
   synth:
     <<: *default

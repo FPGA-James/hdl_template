@@ -501,7 +501,7 @@ def _register_sv_decode(text: str) -> str:
     """Put a register between PeakRDL-regblock's address decode and its field logic.
     The unregistered path (CPU-interface request, then address decode, then each field's
     load enable, which fans out to every bit of the field) is the longest in the design at
-    250 MHz on ECP5. Read and write requests both pass through the register, so they
+    high clock rates. Read and write requests both pass through the register, so they
     stay in order and keep equal latency (regblock's "latencies are balanced, stalls not
     required" still holds). Each response comes one cycle later; the in-flight limit
     already counts requests from acceptance, so the two-entry response buffer cannot
@@ -522,7 +522,7 @@ def render_sv_address_constants(register_list, addr_width: int | None = None) ->
     byte address (4 * the register's real index within the register list)
     -- the same computation the VHDL path's generated read/write package
     uses internally. Verified: generated for this project's real register
-    map, compiled and ran cleanly under both Verilator and Icarus.
+    map, compiled and ran cleanly under Verilator (Icarus cannot parse the interface-based top).
 
     Uses each register's own `.index` attribute, not its position in
     `register_objects` (via `enumerate()`): a `RegisterArray` earlier in

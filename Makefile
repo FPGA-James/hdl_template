@@ -9,19 +9,19 @@
 # =============================================================================
 
 # ── User-configurable variables ───────────────────────────────────────────────
-# Verification framework: vunit | cocotb | native
-FRAMEWORK    ?= vunit
-
-# Simulator: ghdl | verilator (cocotb only; VUnit always uses GHDL)
-SIM          ?= ghdl
-
 # HDL language for simulation/synthesis: vhdl | sv. `make init ... TOPLEVEL_HDL=sv` rewrites
-# these three defaults (FRAMEWORK, SIM, TOPLEVEL_HDL) to cocotb/verilator/sv.
+# this default to sv; FRAMEWORK and SIM below follow it.
 TOPLEVEL_HDL ?= vhdl
 
-# Normalised language key used to pick per-language variables below
+# Normalised language key used to pick per-language variables
 # (anything other than sv is treated as vhdl, as the recipes always did).
 HDL_KIND = $(if $(filter sv,$(TOPLEVEL_HDL)),sv,vhdl)
+
+# Verification framework: vunit | cocotb | native. vunit drives VHDL only, so SV defaults to cocotb.
+FRAMEWORK    ?= $(if $(filter sv,$(HDL_KIND)),cocotb,vunit)
+
+# Simulator: ghdl | verilator (cocotb only; VUnit always uses GHDL). Follows the language.
+SIM          ?= $(if $(filter sv,$(HDL_KIND)),verilator,ghdl)
 
 # Top-level entity/module name (set by make init; matches <<NAME>>_top)
 TOPLEVEL     ?= <<NAME>>_top
@@ -39,10 +39,6 @@ PROJECT      ?= $(notdir $(CURDIR))
 # HDL AutoDoc v3.13 does not read package files before a module's schematic (every module
 # using a package fails with "no declaration for ..."); SCHEMATICS=1 forces them on.
 SCHEMATICS   ?= $(if $(filter sv,$(HDL_KIND)),1,0)
-
-# Normalised language key used to pick per-language variables
-# (anything other than sv is treated as vhdl, as the recipes always did).
-HDL_KIND = $(if $(filter sv,$(TOPLEVEL_HDL)),sv,vhdl)
 
 # ── Includes ──────────────────────────────────────────────────────────────────
 # Order matters only for the help sections (file order) and for core.mk, which
