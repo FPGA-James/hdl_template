@@ -10,13 +10,14 @@
 
 # ── User-configurable variables ───────────────────────────────────────────────
 # Verification framework: vunit | cocotb | native
-FRAMEWORK    ?= cocotb
+FRAMEWORK    ?= vunit
 
-# Simulator: ghdl | verilator | icarus
-SIM          ?= verilator
+# Simulator: ghdl | verilator (cocotb only; VUnit always uses GHDL)
+SIM          ?= ghdl
 
-# HDL language for simulation/synthesis: vhdl | sv
-TOPLEVEL_HDL ?= sv
+# HDL language for simulation/synthesis: vhdl | sv  (`make init` defaults to vhdl too;
+# pass TOPLEVEL_HDL=sv on every command, or change this default, for an SV project)
+TOPLEVEL_HDL ?= vhdl
 
 # Normalised language key used to pick per-language variables below
 # (anything other than sv is treated as vhdl, as the recipes always did).

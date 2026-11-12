@@ -24,7 +24,7 @@ help: ## Show this help
 	@printf "\n\033[1m  Variables\033[0m\n"
 	@printf "    \033[33m%-22s\033[0m %s\n" \
 	  "FRAMEWORK"       "vunit | cocotb | native      (default: $(FRAMEWORK))" \
-	  "SIM"             "ghdl | verilator | icarus    (default: $(SIM))" \
+	  "SIM"             "ghdl | verilator             (default: $(SIM))" \
 	  "TOPLEVEL_HDL"    "vhdl | sv                    (default: $(TOPLEVEL_HDL))" \
 	  "SCHEMATICS"      "0 | 1                        (default: $(SCHEMATICS))" \
 	  "NATIVE_SIM"      "nvc | verilator              (default: $(NATIVE_SIM))" \

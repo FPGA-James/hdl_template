@@ -43,13 +43,32 @@ module <<NAME>>_tb;
     localparam logic [7:0] COMMAND_ADDR = <<NAME>>_command_addr;
     localparam logic [7:0] STATUS_ADDR  = <<NAME>>_status_addr;
 
+    // <<NAME>>_top's bus port is an axil_if interface: bridge the bench's flat
+    // signals (which the driver tasks below use) to one.
+    axil_if #(.ADDR_W(8), .DATA_W(32)) s_axil ();
+    assign s_axil.awprot  = 3'b000;
+    assign s_axil.arprot  = 3'b000;
+    assign s_axil.awvalid = s_axi_awvalid;
+    assign s_axi_awready  = s_axil.awready;
+    assign s_axil.awaddr  = s_axi_awaddr;
+    assign s_axil.wvalid  = s_axi_wvalid;
+    assign s_axi_wready   = s_axil.wready;
+    assign s_axil.wdata   = s_axi_wdata;
+    assign s_axil.wstrb   = s_axi_wstrb;
+    assign s_axi_bvalid   = s_axil.bvalid;
+    assign s_axil.bready  = s_axi_bready;
+    assign s_axi_bresp    = s_axil.bresp;
+    assign s_axil.arvalid = s_axi_arvalid;
+    assign s_axi_arready  = s_axil.arready;
+    assign s_axil.araddr  = s_axi_araddr;
+    assign s_axi_rvalid   = s_axil.rvalid;
+    assign s_axil.rready  = s_axi_rready;
+    assign s_axi_rdata    = s_axil.rdata;
+    assign s_axi_rresp    = s_axil.rresp;
+
     <<NAME>>_top u_dut (
         .clk(clk), .rst_n(rst_n), .pulse_i(pulse_i),
-        .s_axi_awvalid(s_axi_awvalid), .s_axi_awready(s_axi_awready), .s_axi_awaddr(s_axi_awaddr),
-        .s_axi_wvalid(s_axi_wvalid), .s_axi_wready(s_axi_wready), .s_axi_wdata(s_axi_wdata), .s_axi_wstrb(s_axi_wstrb),
-        .s_axi_bvalid(s_axi_bvalid), .s_axi_bready(s_axi_bready), .s_axi_bresp(s_axi_bresp),
-        .s_axi_arvalid(s_axi_arvalid), .s_axi_arready(s_axi_arready), .s_axi_araddr(s_axi_araddr),
-        .s_axi_rvalid(s_axi_rvalid), .s_axi_rready(s_axi_rready), .s_axi_rdata(s_axi_rdata), .s_axi_rresp(s_axi_rresp)
+        .s_axil(s_axil.slave)
     );
 
     task automatic check_equal(int unsigned actual, int unsigned expected, string msg);

@@ -10,7 +10,7 @@
 ##@ Clean
 
 clean: ## Remove build outputs (out/) and sim artefacts
-	@rm -rf out/docs/ out/vunit/ out/cocotb/ out/native/ out/reports/
+	@rm -rf out/docs/ out/vunit/ out/cocotb/ out/native/ out/reports/ waves/
 	@$(MAKE) -C tb/cocotb clean 2>/dev/null || true
 
 clean-generated: clean ## Remove all generated files (out/regs/, out/synth/, out/impl/, filelist.f)

@@ -11,7 +11,6 @@ flattening wrapper -- see tb/cocotb/Makefile for why).
 Run via the top-level Makefile:
     make sim FRAMEWORK=cocotb SIM=ghdl       TOPLEVEL_HDL=vhdl
     make sim FRAMEWORK=cocotb SIM=verilator  TOPLEVEL_HDL=sv
-    make sim FRAMEWORK=cocotb SIM=icarus     TOPLEVEL_HDL=sv
 
 Note on read timing: axil.read()/axil.write() are real multi-cycle AXI-Lite
 bus transactions (via cocotbext-axi's AxiLiteMaster), not single-cycle
@@ -24,13 +23,17 @@ and cocotbext-axi's default AxiLiteMaster
 (no injected backpressure), two consecutive read_status() calls separated by
 W pure RisingEdge waits always satisfy:
     count_after - count_before == (W + READ_TO_READ_OVERHEAD_CYCLES) * step
-READ_TO_READ_OVERHEAD_CYCLES was measured as exactly 4, completely
-deterministically (zero jitter over W in {0,1,2,3,5,7,10} and step in
-{1,5}), identically across GHDL/VHDL, Verilator/SV and Icarus/SV. This lets
+READ_TO_READ_OVERHEAD_CYCLES was measured as exactly 4 for VHDL and exactly 5
+for SV, completely deterministically (zero jitter over W in {0,1,2,3,5,7,10}
+and step in {1,5}). SV is one cycle longer because scripts/gen_regs.py
+registers the SV register file's decode stage (request -> decode -> field
+logic), which hdl-modules' VHDL register file does not have. This lets
 test_count_up/test_increment_step keep exact per-step equality checks
 (rather than degrading to a ">=" or tolerance-band check) despite the
 interleaved live counting.
 """
+
+import os
 
 import cocotb
 from cocotb.clock import Clock
@@ -43,8 +46,8 @@ STATUS_ADDR = 8
 
 # See the module docstring: empirically measured, deterministic extra clock
 # edges consumed by a read_status() call, on top of any explicit RisingEdge
-# waits placed around it.
-READ_TO_READ_OVERHEAD_CYCLES = 4
+# waits placed around it. TOPLEVEL_HDL is exported by tb/cocotb/Makefile.
+READ_TO_READ_OVERHEAD_CYCLES = 5 if os.environ.get("TOPLEVEL_HDL") == "sv" else 4
 
 
 async def setup(dut) -> AxiLiteMaster:

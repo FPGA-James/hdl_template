@@ -19,7 +19,7 @@ VUNIT_SIMULATOR ?= ghdl
 NATIVE_SIM  ?= $(if $(filter sv,$(HDL_KIND)),verilator,nvc)
 NATIVE_RDIR  = out/native
 
-sim: regs ## Run simulation  [FRAMEWORK=vunit|cocotb|native  SIM=ghdl|verilator|icarus  TOPLEVEL_HDL=vhdl|sv]
+sim: regs ## Run simulation  [FRAMEWORK=vunit|cocotb|native  SIM=ghdl|verilator  TOPLEVEL_HDL=vhdl|sv]
 	$(if $(filter vunit cocotb native,$(FRAMEWORK)),@$(MAKE) --no-print-directory sim-$(FRAMEWORK),$(error Unknown FRAMEWORK=$(FRAMEWORK). Valid: vunit | cocotb | native))
 
 sim-vunit: regs ## Run VUnit testbench via GHDL (VHDL only)
@@ -33,6 +33,7 @@ sim-vunit-gui: regs ## Open VUnit testbench in the GHDL waveform viewer
 
 sim-cocotb: regs ## Run cocotb testbench  [SIM=  TOPLEVEL_HDL=vhdl|sv]
 	@printf "\n\033[1m  Running cocotb simulation ($(SIM))...\033[0m\n\n"
+	@mkdir -p waves
 	@$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL) BENDER=$(BENDER)
 
 # Native bench: dispatch to the selected tool's backend.
