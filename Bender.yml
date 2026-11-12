@@ -1,5 +1,6 @@
 package:
   name: hdl_template
+  library: hdl_template  # VHDL library; `make init` sets it to the project name
   authors:
     - "FPGA-James"
 

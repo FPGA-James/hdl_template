@@ -148,6 +148,8 @@ done < <(find . \
     \) -print0 2>/dev/null)
 
 echo "  $CONTENT_COUNT file(s) updated."
+# Bender validates `library` as a VHDL identifier, so it can't hold the <<NAME>> placeholder pre-init.
+sed "${SED_I[@]}" "s/^  library: hdl_template /  library: $NAME /" Bender.yml
 echo ""
 
 # ── Step 2: Rename files with NAME_ prefix ─────────────────────────────────────
