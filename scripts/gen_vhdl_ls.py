@@ -7,7 +7,7 @@ then writes vhdl_ls.toml in the repository root.
 Library mapping:
   axi_lite      ← hdl_modules/modules/axi_lite/
   register_file ← hdl_modules/modules/register_file/
-  work          ← rtl_vhdl + gen_vhdl (project RTL + generated register files)
+  rtl_lib       ← rtl_vhdl + gen_vhdl (project RTL + generated register files)
   tb_lib        ← tb_vhdl (VUnit testbench, simulation target)
 
 Usage:
@@ -103,8 +103,8 @@ def main() -> None:
     else:
         print("  WARNING: hdl_modules not found — run 'make deps' first", file=sys.stderr)
 
-    # ── Project RTL + generated register files → work ─────────────────────────
-    libraries["work"] = bender_flist("rtl_vhdl") + bender_flist("gen_vhdl")
+    # ── Project RTL + generated register files → rtl_lib (vhdl_ls rejects the name "work"; matches tb/vunit/run.py) ──
+    libraries["rtl_lib"] = bender_flist("rtl_vhdl") + bender_flist("gen_vhdl")
 
     # ── VUnit testbench → tb_lib ──────────────────────────────────────────────
     tb_files = bender_flist("simulation", "tb_vhdl")

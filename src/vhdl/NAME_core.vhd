@@ -38,7 +38,8 @@ use work.<<NAME>>_pkg.all;
 -- Parameterisable pulse counter. Counts input pulses when enabled and
 -- reports the running total via the status register interface.
 --
--- Register interface:
+-- Register interface::
+--
 --   enable_i      -- from conf register; enables counting
 --   increment_i   -- from conf register; step size per pulse (1..255)
 --   reset_count_i -- from command register; held-level request, core
@@ -67,7 +68,7 @@ entity <<NAME>>_core is
         -- Asserted whenever enable_i is high and counting is not in reset.
         enabled_o     : out std_logic;
         -- Running pulse count, saturates at (2**C_COUNT_W)-1.
-        pulse_count_o : out std_logic_vector(C_COUNT_W-1 downto 0)
+        pulse_count_o : out std_logic_vector(C_COUNT_W - 1 downto 0)
     );
 end entity <<NAME>>_core;
 
@@ -75,7 +76,7 @@ end entity <<NAME>>_core;
 architecture rtl of <<NAME>>_core is
 
     -- Registered pulse counter. Saturates rather than wrapping.
-    signal count_r : unsigned(C_COUNT_W-1 downto 0) := (others => '0');
+    signal count_r : unsigned(C_COUNT_W - 1 downto 0) := (others => '0');
 
     -- Registered previous value of reset_count_i, used to derive a
     -- one-cycle internal pulse from what is now a held-level input (the
@@ -100,7 +101,7 @@ begin
     --      { "name": "count_r",      "wave": "=..=.==.=.", "data": ["0","0","1","2","0"] },
     --      { "name": "enabled_o",    "wave": "0..1......" }
     --    ]}
-    p_count : process(clk) is
+    p_count : process (clk) is
         variable next_count        : unsigned(C_COUNT_W downto 0);
         variable reset_count_pulse : std_logic;
     begin
@@ -123,7 +124,7 @@ begin
                 if next_count(C_COUNT_W) = '1' then
                     count_r <= (others => '1');
                 else
-                    count_r <= next_count(C_COUNT_W-1 downto 0);
+                    count_r <= next_count(C_COUNT_W - 1 downto 0);
                 end if;
                 enabled_o <= '1';
             else

@@ -1,16 +1,16 @@
-# <<NAME>> — Yosys synthesis script (SystemVerilog path, Xilinx 7-series).
+# <<NAME>> — standalone Yosys synthesis script (SystemVerilog path, Xilinx 7-series).
 #
+# `make synth TOPLEVEL_HDL=sv` runs Yosys directly from the Bender file lists and does not
+# use this script; it is the same flow as a stand-alone file, handy for editing by hand.
+#
+# Run from the repository root after `make regs` (the generated register file must exist):
+#   yosys synth/<<NAME>>_sv_xc7.ys
 # Reads SystemVerilog natively (no GHDL plugin required).
-# The SV top-level does not instantiate the generated VHDL register file;
-# replace the stub register connections in NAME_top.sv with your SV register block.
-#
-# Run via: make synth TOPLEVEL_HDL=sv
-# Run directly: yosys synth/<<NAME>>_sv_xc7.ys
 
-# ── Read SystemVerilog sources (order matters: pkg → core → top) ──────────────
-read_verilog -sv src/sv/<<NAME>>_pkg.sv
-read_verilog -sv src/sv/<<NAME>>_core.sv
-read_verilog -sv src/sv/<<NAME>>_top.sv
+# ── Read SystemVerilog sources ─────────────────────────────────────────────────
+# One read_verilog for all files, packages and interfaces first -- the same order and
+# command shape as `make synth`.
+read_verilog -sv src/sv/<<NAME>>_pkg.sv src/sv/axil_if.sv out/regs/sv/<<NAME>>_regs_addr_pkg.sv out/regs/sv/<<NAME>>_register_file_axi_lite_pkg.sv out/regs/sv/<<NAME>>_register_file_axi_lite.sv src/sv/<<NAME>>_core.sv src/sv/<<NAME>>_top.sv
 
 # ── Synthesise for Xilinx 7-series ────────────────────────────────────────────
 synth_xilinx -family xc7 -top <<NAME>>_top -edif synth/output/<<NAME>>_sv.edif

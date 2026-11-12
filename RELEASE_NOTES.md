@@ -1,5 +1,18 @@
 # Release Notes
 
+## V1.5.0 — Build system, ECP5 flow and interface-style example (synced from a downstream project)
+
+A project built from this template improved its generic machinery; this release carries that back. VHDL and SystemVerilog are both still first class.
+
+- **`scripts/mk/` build system.** The 680-line `Makefile` is now a thin entry point (user variables + includes) over one file per flow (`sim`, `synth`, `impl`, `docs`, `lint`, ...) and one per tool backend in `scripts/mk/tools/`. Tools are chosen by top-level variables (`SYNTH_TOOL`, `IMPL_TOOL`, `NATIVE_SIM`, `IMPL_FAMILY`); a new backend (Questa, Vivado, ...) is one file that registers itself, and an unknown tool prints the registered ones. Defaults stay `vunit`/`ghdl`/`vhdl`.
+- **ECP5 implementation flow** (Yosys + nextpnr + `ecppack`) as the default `make impl` backend, with a timing gate: `scripts/check_nextpnr_timing.sh` fails the build if routed Fmax misses `IMPL_FREQ_MHZ` (default 200). Constraint files are optional; iCE40 and MachXO2 remain selectable. SV implements `<name>_top`; VHDL implements `<name>_core` (the top's AXI-Lite records exceed the package's pins).
+- **SV example uses an `axil_if` interface** (`src/sv/axil_if.sv`) for its AXI4-Lite port. The generated address package gains a lowercase `<name>_addr_width`; testbenches reach the interface through flattening wrappers (`tb/cocotb/NAME_top_cocotb_top.sv`, `tb/cpp/NAME_top_cpp_flat.sv`). **Icarus is no longer supported for SV** (it cannot parse modport ports).
+- **SV register file**: the decode stage is registered (shorter critical path; SV register reads/writes take one more cycle — `test_NAME.py` pins 5 cycles for SV, 4 for VHDL).
+- **pyuvm testbench** (`PYUVM=1`, `tb/cocotb/pyuvm_tb/`) for both languages, with a `CounterModel` reference model.
+- **Docs**: HDLAutoDoc v3.13.0 consumed through its `autodoc.mk`; Testbenches/Build/Coverage pages; Mermaid diagrams; RTL schematics default on for SV and off for VHDL.
+- **VHDL lint actually runs vsg now.** `python -m vsg` is a silent no-op and `vsg.yml` used a key vsg ignores, so style checks never ran; both are fixed (four style findings in `NAME_core.vhd` fixed with them).
+- `make init` also renames `NAME_*.lpf`. `sim-cocotb` creates `waves/` again.
+
 ## V1.4.0 — CI actually works
 
 Both GitHub Actions workflows (`ci.yml`, `docs.yml`) had never fully passed since this repo's first commit. All of it traces back to real, fixable infrastructure bugs, not the `<<NAME>>`-placeholder limitation already known about — that limitation is real too, but it was never the thing actually blocking every run.

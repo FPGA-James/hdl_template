@@ -79,29 +79,38 @@ run_lang() {
         "$REPO_ROOT/" "$dir/"
     cd "$dir"
 
-    step "$lang" "init" bash scripts/init_project.sh smoketest "$lang"
+    # A name with a digit and an underscore exercises init's validation and substitution.
+    step "$lang" "init" bash scripts/init_project.sh my_ip2 "$lang"
+    step "$lang" "init-defaults" grep -q "^TOPLEVEL_HDL ?= $lang" Makefile
+    step "$lang" "init-residue" bash -c "! grep -rIl -e '<<NAM[E]>>' -e 'a[e]s' . --exclude-dir=.git --exclude-dir=submodules --exclude-dir=superpowers --exclude-dir=.superpowers --exclude-dir=.venv | grep . && test -z \"\$(find . -name 'NAME_*' -not -path './submodules/*' -not -path './.venv/*')\""
     step "$lang" "venv" make venv
     step "$lang" "deps" make deps
     step "$lang" "regs" make regs
     step "$lang" "lsp"  make lsp
 
     if [[ "$lang" == vhdl ]]; then
-        step "$lang" "lint-vhdl"        make lint-vhdl
+        step "$lang" "lint-vhdl"        make lint-vhdl TOPLEVEL_HDL=vhdl
         step "$lang" "install-osvvm"    nvc --install osvvm
         step "$lang" "sim-native"       make sim-native TOPLEVEL_HDL=vhdl
         step "$lang" "sim-cocotb-ghdl"  make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl
         step "$lang" "sim-vunit"        make sim FRAMEWORK=vunit
+        step "$lang" "sim-pyuvm-ghdl"   make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl PYUVM=1
         step "$lang" "synth"            make synth TOPLEVEL_HDL=vhdl
+        step "$lang" "impl"             make impl TOPLEVEL_HDL=vhdl
     else
-        step "$lang" "lint-sv"              make lint-sv
+        step "$lang" "lint-sv"              make lint-sv TOPLEVEL_HDL=sv
         step "$lang" "sim-native"           make sim-native TOPLEVEL_HDL=sv
         step "$lang" "sim-cocotb-verilator" make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv
+        step "$lang" "sim-pyuvm-verilator"  make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv PYUVM=1
         step "$lang" "sim-cpp"              make sim-cpp TOPLEVEL_HDL=sv
         step "$lang" "synth"                make synth TOPLEVEL_HDL=sv
+        step "$lang" "impl"                 make impl TOPLEVEL_HDL=sv
     fi
 
-    step "$lang" "html"            make html
-    step "$lang" "coverage"        make coverage
+    step "$lang" "html"            make html TOPLEVEL_HDL="$lang"
+    step "$lang" "coverage"        make coverage TOPLEVEL_HDL="$lang"
+    step "$lang" "test-autodoc"    make test-autodoc
+    step "$lang" "gen-regs-tests"  .venv/bin/python3 -m pytest scripts/tests -q
     step "$lang" "clean-generated" make clean-generated
 }
 

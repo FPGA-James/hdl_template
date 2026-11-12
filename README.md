@@ -10,12 +10,13 @@ An HDL project starter for FPGA projects supporting VHDL and SystemVerilog side-
 
 | Capability | Tools |
 |---|---|
+| **Build system** | `make`, split into `scripts/mk/` (one file per flow, one per tool backend); tools are picked by top-level variables, and a new backend is one file in `scripts/mk/tools/` |
 | **Dependency management** | [Bender](https://github.com/pulp-platform/bender) (primary) + [FuseSoC](https://fusesoc.readthedocs.io) (`template.core`) |
 | **Register generation** | [hdl-registers](https://hdl-registers.com) — TOML → VHDL/SV register file, C header, HTML, with automatic field-to-port wiring into `<name>_top` |
-| **Simulation — VHDL** | GHDL + [VUnit](https://vunit.github.io) or [cocotb](https://www.cocotb.org), or native via [NVC](https://www.nickg.me.uk/nvc/) |
-| **Simulation — SV** | Verilator or Icarus Verilog + cocotb, or native via `verilator --binary` |
+| **Simulation — VHDL** | GHDL + [VUnit](https://vunit.github.io) or [cocotb](https://www.cocotb.org) (plain or [pyuvm](https://github.com/pyuvm/pyuvm)), or native via [NVC](https://www.nickg.me.uk/nvc/) |
+| **Simulation — SV** | Verilator + cocotb (plain or pyuvm), native via `verilator --binary`, or a C++ harness (`make sim-cpp`). Icarus is not supported: it cannot parse the `axil_if` modport port (see `CLAUDE.md`) |
 | **Synthesis** | [Yosys](https://yosyshq.net/yosys/) targeting Xilinx XC7 (`synth_xilinx -family xc7`) |
-| **Implementation** | [nextpnr](https://github.com/YosysHQ/nextpnr) place-and-route for iCE40, ECP5, MachXO2 |
+| **Implementation** | [nextpnr](https://github.com/YosysHQ/nextpnr) place-and-route (ECP5 by default; iCE40, MachXO2) with a timing gate on `IMPL_FREQ_MHZ` |
 | **Linting — VHDL** | GHDL analysis + [vsg](https://vsg-hdl.readthedocs.io) (VHDL Style Guide) |
 | **Linting — SV** | Verilator `--lint-only -Wall` |
 | **Documentation** | [HDLAutoDoc](https://github.com/FPGA-James/HDLAutoDoc) Sphinx pipeline — block diagrams, FSM diagrams, WaveDrom waveforms, CDC analysis, register map |
@@ -85,7 +86,7 @@ Reads `regs/<name>_regs.toml` and writes to `out/regs/vhdl/` (VHDL projects) or 
 
 Naming convention (strict, no exceptions): a register field named `<leaf>` must have a matching `<name>_core` port named `<leaf>_i` (for `w`/`r_w` mode fields) or `<leaf>_o` (for `r` mode fields), and no two fields may share a leaf name (each must resolve to a distinct port). A `<name>_core` port that isn't matched by any field must have an identically-named port on `<name>_top` to pass through (e.g. `clk`, `rst_n`) — otherwise `make regs` fails, naming the exact field or port at fault.
 
-The generated SV register file needs light post-processing to stay synthesizable on free/OSS Yosys (PeakRDL-regblock's output isn't otherwise accepted by Yosys's SV frontend) — `make regs` handles this automatically. See `CLAUDE.md`'s "SV register-file synthesizability" note for details and one known residual gap (Icarus-based cocotb simulation, untested).
+The generated SV register file needs light post-processing to stay synthesizable on free/OSS Yosys (PeakRDL-regblock's output isn't otherwise accepted by Yosys's SV frontend) — `make regs` handles this automatically. See `CLAUDE.md`'s "SV register-file synthesizability" note for details and why Icarus is not supported for SystemVerilog.
 
 ### 6 — Run the testbench
 
@@ -93,7 +94,9 @@ The generated SV register file needs light post-processing to stay synthesizable
 make sim                                              # VHDL + VUnit + GHDL (default)
 make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl  # VHDL + cocotb + GHDL
 make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv # SV + cocotb + Verilator
-make sim FRAMEWORK=cocotb SIM=icarus TOPLEVEL_HDL=sv    # SV + cocotb + Icarus
+make sim FRAMEWORK=cocotb SIM=ghdl TOPLEVEL_HDL=vhdl PYUVM=1      # VHDL + pyuvm bench
+make sim FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv PYUVM=1   # SV + pyuvm bench
+make sim-cpp TOPLEVEL_HDL=sv                            # SV, C++ harness — Verilator --cc --exe
 make sim-native TOPLEVEL_HDL=vhdl                       # VHDL, no framework — NVC directly
 make sim-native TOPLEVEL_HDL=sv                         # SV, no framework — Verilator --binary directly
 ```
@@ -145,9 +148,9 @@ make sim-cpp         Run the C++ testbench directly with Verilator --cc --exe --
 make lint            VHDL: GHDL analysis + vsg  |  SV: Verilator --lint-only
 make lint-vhdl       VHDL lint only
 make lint-sv         SV lint only
-make synth           Yosys XC7 synthesis; reports in out/reports/synth/
+make synth           Yosys XC7 synthesis; reports in out/reports/yosys/
 make synth-gui       Open Yosys schematic viewer for the synthesised netlist
-make impl            nextpnr place-and-route; bitstream in out/impl/
+make impl            nextpnr place-and-route (ECP5 default) + timing check; bitstream in out/impl/
 make impl-gui        Open nextpnr interactive placement/routing GUI
 make icestudio       Run full impl then open IceStudio for device programming
 make html            Build Sphinx documentation
@@ -166,16 +169,22 @@ make verible-ls      Generate verible.filelist for Verible
 
 | Variable | Default | Options |
 |---|---|---|
-| `FRAMEWORK` | `vunit` | `vunit` \| `cocotb` |
-| `SIM` | `ghdl` | `ghdl` \| `verilator` \| `icarus` |
+| `FRAMEWORK` | `vunit` (`cocotb` for SV) | `vunit` \| `cocotb` \| `native` |
+| `PYUVM` | `0` | `1` runs the pyuvm bench instead of `test_NAME.py` (cocotb only) |
+| `SIM` | `ghdl` (`verilator` for SV) | `ghdl` \| `verilator` (cocotb only) |
 | `TOPLEVEL_HDL` | `vhdl` | `vhdl` \| `sv` |
-| `IMPL_FAMILY` | `ice40` | `ice40` \| `ecp5` \| `machxo2` |
-| `IMPL_DEVICE` | `hx8k` | e.g. `hx1k`, `lfe5u-25f` |
-| `IMPL_PACKAGE` | `ct256` | e.g. `tq144`, `CABGA256` |
-| `IMPL_TOPLEVEL` | `<<NAME>>_core` | any entity with a matching constraint file |
+| `SYNTH_TOOL` | `yosys` | any backend registered in `scripts/mk/tools/` |
+| `IMPL_TOOL` | `nextpnr` | any registered backend |
+| `NATIVE_SIM` | `nvc` (VHDL) / `verilator` (SV) | any registered backend |
+| `IMPL_FAMILY` | `ecp5` | `ecp5` \| `ice40` \| `machxo2` |
+| `IMPL_DEVICE` | `25k` | e.g. `hx8k` (ice40), `25k`/`85k` (ecp5) |
+| `IMPL_PACKAGE` | `CABGA256` | e.g. `ct256`, `tq144` |
+| `IMPL_FREQ_MHZ` | `200` | target clock; `make impl` fails if nextpnr's routed result misses it |
+| `IMPL_TOPLEVEL` | `<<NAME>>_top` (SV) / `<<NAME>>_core` (VHDL) | any module; its constraint file is optional |
+| `SCHEMATICS` | `1` (SV) / `0` (VHDL) | RTL schematics in the docs |
 | `ICESTUDIO` | `IceStudio` | app name (macOS) or binary (Linux) |
 
-**Compatibility:** `SIM=ghdl` requires `TOPLEVEL_HDL=vhdl`. `SIM=verilator` or `SIM=icarus` requires `TOPLEVEL_HDL=sv`. The cocotb Makefile enforces this with a guard.
+**Compatibility:** `SIM=ghdl` requires `TOPLEVEL_HDL=vhdl`. `SIM=verilator` requires `TOPLEVEL_HDL=sv`. The cocotb Makefile enforces this with a guard.
 
 ---
 
@@ -200,14 +209,14 @@ Needs the full toolchain on `PATH` (OSS CAD Suite, Bender, NVC) and network acce
 hdl_template/
 ├── Bender.yml              HDL dependency manifest (primary source of truth for file lists)
 ├── template.core           FuseSoC CAPI=2 manifest (kept in sync with Bender.yml)
-├── Makefile
+├── Makefile                Entry point: user variables + includes
 ├── requirements.txt
 ├── vsg.yml                 VHDL Style Guide linter config
 ├── pytest.ini
 │
 ├── src/
 │   ├── vhdl/               VHDL source (NAME_pkg, NAME_core, NAME_top)
-│   └── sv/                 SV mirror (identical port names)
+│   └── sv/                 SV mirror, plus axil_if.sv (the AXI4-Lite interface NAME_top takes)
 │
 ├── tb/
 │   ├── vunit/
@@ -215,7 +224,8 @@ hdl_template/
 │   │   └── vhdl/NAME_tb.vhd
 │   ├── cocotb/
 │   │   ├── Makefile        cocotb sim Makefile
-│   │   └── test_NAME.py    cocotb tests (language-agnostic)
+│   │   ├── test_NAME.py    cocotb tests (language-agnostic)
+│   │   └── pyuvm_tb/       pyuvm bench (PYUVM=1): register agent + counter reference model
 │   └── native/             Framework-less testbenches — run directly by NVC (VHDL) / Verilator --binary (SV)
 │       ├── vhdl/NAME_tb.vhd
 │       └── sv/NAME_tb.sv
@@ -224,7 +234,7 @@ hdl_template/
 │   └── NAME_regs.toml      Register definitions (hdl-registers TOML format)
 │
 ├── synth/
-│   └── constraints/        PCF (iCE40) and LPF (ECP5/MachXO2) pin constraints
+│   └── constraints/        optional PCF (iCE40) / LPF (ECP5/MachXO2) pin constraints (NAME_top.lpf ships)
 │
 ├── out/                    All tool outputs — gitignored (out/.gitkeep tracked)
 │   ├── regs/               Generated register files (vhdl/, c/, html/)
@@ -236,6 +246,8 @@ hdl_template/
 │   └── vunit/ cocotb/ native/ waves/  Simulation artefacts
 │
 ├── scripts/
+│   ├── mk/                 Makefile fragments: one per flow, tool backends in mk/tools/
+│   ├── check_nextpnr_timing.sh  fails `make impl` when routed Fmax misses IMPL_FREQ_MHZ
 │   ├── gen_regs.py         hdl-registers generation driver
 │   ├── gen_filelist.sh     Bender → filelist.f
 │   ├── gen_vhdl_ls.py      Bender → vhdl_ls.toml (VHDL LS config)
@@ -246,7 +258,7 @@ hdl_template/
 ├── submodules/
 │   └── HDLAutoDoc/         Git submodule — HDL AutoDoc extraction/generation scripts (source of truth; not vendored)
 │
-└── docs/                   Sphinx documentation source (conf.py, _static/, _templates/ are project-owned, not from the submodule)
+└── docs/                   Sphinx documentation source (conf.py is a thin wrapper around the tool's own; pages are generated)
 ```
 
 ---
@@ -267,7 +279,7 @@ GitHub Actions runs on every push and pull request:
 |---|---|
 | `regs` | hdl-registers + drift check (regenerate + diff) |
 | `test-autodoc` | pytest (HDLAutoDoc test suite) |
-| `smoke-test` (vhdl, sv matrix) | `scripts/smoke_test.sh` — runs `make init` first, then `regs`/`lsp`/every testbench flow/`lint`/`synth`/`html`/`coverage` against the initialised project. This is the job that actually reflects what a real user of this template builds against. |
+| `smoke-test` (vhdl, sv matrix) | `scripts/smoke_test.sh` — runs `make init` first, then `regs`/`lsp`/every testbench flow (including pyuvm)/`lint`/`synth`/`impl`/`html`/`coverage` against the initialised project. This is the job that actually reflects what a real user of this template builds against. |
 
 **Six jobs are commented out in `.github/workflows/ci.yml`** (`lint`, `sim-vhdl-vunit`, `sim-vhdl-cocotb`, `sim-sv-verilator`, `sim-sv-icarus`, `synth`): they ran directly against this repo's un-initialised checkout, where RTL/register-file paths still contain the literal `<<NAME>>` placeholder — `Bender.yml`'s own source lists use that same placeholder, so they never resolved to real files and could not pass by design, not due to a bug. They're left in the workflow file as comments (not deleted) in case they're ever reworked to run against a `make init`'d scratch copy instead, mirroring `smoke-test`'s own approach — at which point they'd stop being redundant with it. Until then, `smoke-test` is the only job worth watching; don't re-enable the others without addressing the `<<NAME>>` gap first, or every push will red them out again.
 
@@ -282,7 +294,6 @@ The `docs.yml` workflow builds Sphinx HTML for the template's bundled example on
 | Python 3.13 | Everything | `brew install python` / `apt install python3` |
 | GHDL | VHDL sim, lint, synthesis | `apt install ghdl` / [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build/releases) |
 | Verilator | SV sim + lint | `apt install verilator` / `brew install verilator` |
-| Icarus Verilog | SV sim (icarus path) | `apt install iverilog` / `brew install icarus-verilog` |
 | Yosys | Synthesis | `apt install yosys` / [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build/releases) |
 | [NVC](https://www.nickg.me.uk/nvc/) | `make sim-native TOPLEVEL_HDL=vhdl` | `brew install nvc` / [releases](https://github.com/nickg/nvc/releases) — not part of OSS CAD Suite; also run `nvc --install osvvm` once, needed by the native VHDL testbench |
 | Graphviz | Documentation diagrams | `apt install graphviz` / `brew install graphviz` |

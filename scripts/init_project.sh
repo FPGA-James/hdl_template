@@ -108,10 +108,20 @@ for subdir in vhdl sv; do
             -name "*.yml" -o -name "*.yaml" -o -name "*.core" \
             -o -name "*.md"  -o -name "*.rst" -o -name "*.py"  \
             -o -name "*.sh"  -o -name "*.f"   -o -name "Makefile" \
+            -o -name "*.ys"  -o -name "*.mk" \
         \) -print0 2>/dev/null)
 done
 
 echo ""
+
+# ── SV projects: switch the Makefile's language default ────────────────────────
+# So a bare `make sim|lint|synth|impl|html` takes the SV path without TOPLEVEL_HDL=sv
+# on every command (FRAMEWORK and SIM follow TOPLEVEL_HDL in the Makefile).
+if [[ "$TOPLEVEL_HDL" == "sv" && -f Makefile ]]; then
+    sed "${SED_I[@]}" -e 's/^TOPLEVEL_HDL ?= vhdl/TOPLEVEL_HDL ?= sv/' Makefile
+    echo "  Makefile default set for SystemVerilog: TOPLEVEL_HDL=sv"
+    echo ""
+fi
 
 # ── Step 1: Replace <<NAME>> in file contents ──────────────────────────────────
 echo "Step 1: Replacing <<NAME>> in file contents..."
@@ -132,6 +142,7 @@ done < <(find . \
         -o -name "*.rst" -o -name "*.md"  -o -name "*.txt"  \
         -o -name "Makefile" -o -name "*.mk" -o -name "*.core" \
         -o -name "*.f"   -o -name "*.ys"  -o -name "*.xdc"  \
+        -o -name "*.lpf" -o -name "*.pcf" \
         -o -name "*.cpp" -o -name "*.h"   -o -name "*.hpp"  \
         -o -name "Bender.yml" \
     \) -print0 2>/dev/null)
@@ -154,7 +165,7 @@ done < <(find . \
     \( \
         -name "NAME_*.vhd" -o -name "NAME_*.sv" -o -name "NAME_*.v" \
         -o -name "NAME_*.py" -o -name "NAME_*.toml" -o -name "NAME_*.ys" \
-        -o -name "NAME_*.xdc" -o -name "NAME_*.rst" \
+        -o -name "NAME_*.xdc" -o -name "NAME_*.lpf" -o -name "NAME_*.rst" \
         -o -name "NAME_*.cpp" -o -name "NAME_*.h" -o -name "NAME_*.hpp" \
     \) -print0 2>/dev/null)
 

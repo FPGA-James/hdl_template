@@ -8,7 +8,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdio>
-#include "V<<NAME>>_top.h"
+#include "V<<NAME>>_top_cpp_flat.h"
 #include "verilated.h"
 #include "axi_lite_driver.hpp"
 #include "<<NAME>>_regs.h"
@@ -18,9 +18,9 @@ double sc_time_stamp() { return main_time; }
 
 int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
-    auto* top = new V<<NAME>>_top;
+    auto* top = new V<<NAME>>_top_cpp_flat;
 
-    AxiLiteDriver<V<<NAME>>_top> axil(top);
+    AxiLiteDriver<V<<NAME>>_top_cpp_flat> axil(top);
     axil.tick = [&]() {
         top->clk = 0; top->eval(); main_time++;
         top->clk = 1; top->eval(); main_time++;

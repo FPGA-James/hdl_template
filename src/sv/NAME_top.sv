@@ -43,24 +43,13 @@ module <<NAME>>_top (
     // Pulse input to be counted.
     input  logic        pulse_i,
 
-    // ── AXI4-Lite subordinate register interface (32-bit, 8-bit addr) ───────
-    input  logic        s_axi_awvalid,
-    output logic        s_axi_awready,
-    input  logic [7:0]  s_axi_awaddr,
-    input  logic        s_axi_wvalid,
-    output logic        s_axi_wready,
-    input  logic [31:0] s_axi_wdata,
-    input  logic [3:0]  s_axi_wstrb,
-    output logic        s_axi_bvalid,
-    input  logic        s_axi_bready,
-    output logic [1:0]  s_axi_bresp,
-    input  logic        s_axi_arvalid,
-    output logic        s_axi_arready,
-    input  logic [7:0]  s_axi_araddr,
-    output logic        s_axi_rvalid,
-    input  logic        s_axi_rready,
-    output logic [31:0] s_axi_rdata,
-    output logic [1:0]  s_axi_rresp
+    // ── AXI4-Lite subordinate register interface ─────────────────────────────
+    //
+    // Interface-typed ports carry no input/output keyword -- direction
+    // comes from the modport (Yosys's read_verilog -sv rejects input/output
+    // on an interface port).
+    // AXI4-Lite subordinate interface to the register file (host bus).
+    axil_if.slave  s_axil
 );
 
     // ── Register file signals ────────────────────────────────────────────────
@@ -74,32 +63,32 @@ module <<NAME>>_top (
     // Module and package are produced by `make regs` via hdl_registers +
     // PeakRDL-regblock. Source: out/regs/sv/<<NAME>>_register_file_axi_lite.sv
     //
-    // Bus-side connection: this project's s_axi_* ports don't match the
-    // generated module's flattened s_axil_* names 1:1 (it also has
-    // AWPROT/ARPROT, which this port list doesn't expose) -- wired by hand
-    // below, not by the generator.
+    // Bus-side connection: the generated module's awaddr/araddr are
+    // <<NAME>>_addr_width bits wide (from the generated address package) against
+    // s_axil's ADDR_W -- sliced explicitly below so a register-map change that
+    // widens the generated address port cannot silently alias addresses.
     <<NAME>>_register_file_axi_lite u_regs (
         .clk           (clk),
         .rst           (~rst_n),          // generated module uses active-high reset
-        .s_axil_awready(s_axi_awready),
-        .s_axil_awvalid(s_axi_awvalid),
-        .s_axil_awaddr (s_axi_awaddr),
-        .s_axil_awprot (3'b000),
-        .s_axil_wready (s_axi_wready),
-        .s_axil_wvalid (s_axi_wvalid),
-        .s_axil_wdata  (s_axi_wdata),
-        .s_axil_wstrb  (s_axi_wstrb),
-        .s_axil_bready (s_axi_bready),
-        .s_axil_bvalid (s_axi_bvalid),
-        .s_axil_bresp  (s_axi_bresp),
-        .s_axil_arready(s_axi_arready),
-        .s_axil_arvalid(s_axi_arvalid),
-        .s_axil_araddr (s_axi_araddr),
-        .s_axil_arprot (3'b000),
-        .s_axil_rready (s_axi_rready),
-        .s_axil_rvalid (s_axi_rvalid),
-        .s_axil_rdata  (s_axi_rdata),
-        .s_axil_rresp  (s_axi_rresp),
+        .s_axil_awready(s_axil.awready),
+        .s_axil_awvalid(s_axil.awvalid),
+        .s_axil_awaddr (s_axil.awaddr[<<NAME>>_regs_addr_pkg::<<NAME>>_addr_width-1:0]),
+        .s_axil_awprot (s_axil.awprot),
+        .s_axil_wready (s_axil.wready),
+        .s_axil_wvalid (s_axil.wvalid),
+        .s_axil_wdata  (s_axil.wdata),
+        .s_axil_wstrb  (s_axil.wstrb),
+        .s_axil_bready (s_axil.bready),
+        .s_axil_bvalid (s_axil.bvalid),
+        .s_axil_bresp  (s_axil.bresp),
+        .s_axil_arready(s_axil.arready),
+        .s_axil_arvalid(s_axil.arvalid),
+        .s_axil_araddr (s_axil.araddr[<<NAME>>_regs_addr_pkg::<<NAME>>_addr_width-1:0]),
+        .s_axil_arprot (s_axil.arprot),
+        .s_axil_rready (s_axil.rready),
+        .s_axil_rvalid (s_axil.rvalid),
+        .s_axil_rdata  (s_axil.rdata),
+        .s_axil_rresp  (s_axil.rresp),
         .hwif_in       (hwif_in),
         .hwif_out      (hwif_out)
     );
