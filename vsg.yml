@@ -1,57 +1,89 @@
 # vsg.yml — VHDL Style Guide linter configuration.
 # Run via: make lint-vhdl
 # Docs: https://vsg-hdl.readthedocs.io/
+#
+# vsg only reads the top-level `rule:` key (an earlier version of this file
+# used `rules:`/`indent:`/`naming:`, which vsg silently ignores). Everything
+# below tunes vsg's defaults to this code base's established style (the
+# historical template plus src/*.vhd) rather than reformatting the code to
+# vsg's own house style. Inspect any rule with `.venv/bin/vsg -rc <rule>`.
+# No naming-prefix rules (G_/C_/t_) are enforced: choose your own convention
+# and add the matching vsg rules here if you want them checked.
 
 ---
-rules:
-  # ── Indentation ──────────────────────────────────────────────────────────────
-  indent:
-    spaces: 4
+rule:
+  global:
+    indent_size: 4
 
-  # ── Naming conventions ────────────────────────────────────────────────────────
-  naming:
-    # Entity names: no required prefix/suffix
-    entity:
-      prefix: ""
-      suffix: ""
-    # Architecture names must be one of the listed identifiers
-    architecture:
-      name:
-        - rtl
-        - bench
-        - str
-        - behav
-    # Signals: registered signals use _r suffix, combinational signals _s
-    signal:
-      # Enforce _r suffix for registered signals and _s for combinational via
-      # process label conventions rather than a blanket rename rule.
-      # Adjust or remove if your naming conventions differ.
-      prefix: ""
-      suffix: ""
-    # Generics: G_ prefix
-    generic:
-      prefix: "G_"
-      suffix: ""
-    # Constants: C_ prefix
-    constant:
-      prefix: "C_"
-      suffix: ""
-    # Types: t_ prefix
-    type:
-      prefix: "t_"
-      suffix: ""
-    # Port names: no required prefix/suffix (HDL AutoDoc extracts comments)
-    port:
-      prefix: ""
-      suffix: ""
+  # ── Rule groups that conflict with the code base's layout ────────────────────
+  group:
+    # Blank-line placement (above/below begin, end if, when, ...) and
+    # column alignment of :, :=, =>, <= and trailing comments are not
+    # enforced: the code aligns by hand, and gen_regs.py's auto-wired region
+    # in <<NAME>>_top.vhd is regenerated on every `make regs` without alignment.
+    blank_line:
+      disable: true
+    alignment:
+      disable: true
 
-  # ── Rules to relax ────────────────────────────────────────────────────────────
-  # These rules are common sources of false positives in well-written HDL.
-
-  # Allow multiple assignments per line in case statements.
-  case_010:
-    severity: warning
-
-  # Do not require 'all' in process sensitivity lists (VHDL-2008 allows this).
+  # ── Pre-existing waivers ─────────────────────────────────────────────────────
+  # (The old case_010 waiver was dropped: case_010 is a blank_line-group rule,
+  # already disabled above.)
+  # Do not require `is` after `process (...)`.
   process_012:
-    severity: warning
+    severity: Warning
+
+  # ── Matched to the code base's conventions ──────────────────────────────────
+  # Port direction spacing: `clk : in  std_logic;` / `x : out std_logic;`.
+  port_007:
+    spaces_after: 2
+  port_008:
+    spaces_after: 1
+  # Hex literals are lowercase (x"1b").
+  bit_string_literal_501:
+    case: lower
+  # FSM state literals mirror the SV (S_IDLE, S_ACCEPT, ...).
+  type_500:
+    case: upper
+  # `x <= '1' when cond else '0';` on one line.
+  conditional_waveforms_001:
+    allow_single_line: "yes"
+  # Long right-hand sides may wrap straight after `<=`.
+  sequential_008:
+    new_line_after_assign: ignore
+
+  # ── Disabled: conflict with project decisions ───────────────────────────────
+  # Registers carry initial values so no 'U' reaches a port before the first
+  # reset edge (cocotbext-axi samples at t=0).
+  signal_007:
+    disable: true
+  # Direct entity instantiation (`entity work.x`), no components, no explicit
+  # architecture -- also what gen_regs.py emits for u_core.
+  instantiation_034:
+    disable: true
+  instantiation_036:
+    disable: true
+  # Trailing comments in port maps (e.g. `reset => not rst_n, -- ...`).
+  port_map_010:
+    disable: true
+  # No parentheses around if conditions.
+  if_002:
+    disable: true
+  # Constants/generics mirror the SV names (C_COUNT_W, DATA_W).
+  constant_004:
+    disable: true
+  generic_007:
+    disable: true
+  # `function name(arg : t) return t` on one line, no space before `(`.
+  function_019:
+    disable: true
+  function_100:
+    disable: true
+  # `use` clauses are not indented under `library`.
+  library_008:
+    disable: true
+  # Comments are not forced to the indent of the next statement: the
+  # gen_regs.py END markers in <<NAME>>_top.vhd sit (indented) directly before
+  # `begin` / `end architecture`, and a comment between use clauses is fine.
+  comment_010:
+    disable: true
