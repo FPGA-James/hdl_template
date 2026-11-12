@@ -39,7 +39,7 @@ scripts/mk/tools/*.mk   yosys, nextpnr, nvc, verilator, ghdl (lint-vhdl), icestu
 
 **Adding a tool backend (e.g. Questa, Vivado):** drop a file in `scripts/mk/tools/<tool>.mk` that appends itself to the registry for the flows it provides (`SYNTH_TOOLS += vivado`, `IMPL_TOOLS += vivado`, `SIM_NATIVE_TOOLS += questa`) and defines the matching `<flow>-<tool>` targets (`synth-vivado`, `impl-vivado` / `impl-gui-vivado`, `sim-native-questa`); select it with `SYNTH_TOOL=vivado` / `IMPL_TOOL=vivado` / `NATIVE_SIM=questa`. Nothing else needs editing — the dispatchers use `$(wildcard scripts/mk/tools/*.mk)` and an unregistered tool gets an error listing the registered ones (`unknown-tool` macro in `scripts/mk/core.mk`). Tool-specific variables (family/part/constraint) belong in the tool's own file; vendor flows are best written as Tcl/DO scripts under `scripts/<tool>/` that the `.mk` file launches. cocotb and VUnit pick their simulator from `SIM` / `VUNIT_SIMULATOR` (see `tb/cocotb/Makefile`, `tb/vunit/run.py`) — those two files need a Questa branch too. Bender can emit tool-specific file lists directly (`bender script vsim`, `bender script vivado`).
 
-Conventions that keep the include-based layout working: help entries (`## description`) for dispatched/aliased targets live in the flow file as recipe-less "stubs" (the recipe is in the tool file), and any alias target with no real recipe gets an explicit `@:` recipe so make does not try the `<flow>-%` fallback rule on it. `HDL_KIND` is the normalised language key (`sv` or `vhdl`) used for per-language variables (`YOSYS_READ_$(HDL_KIND)`). The defaults are `FRAMEWORK=vunit SIM=ghdl TOPLEVEL_HDL=vhdl` (what `make init` also defaults to); pass `TOPLEVEL_HDL=sv` on every command, or change the default in `Makefile`, for an SV project. `lint-sv` and the sim targets depend on `regs`.
+Conventions that keep the include-based layout working: help entries (`## description`) for dispatched/aliased targets live in the flow file as recipe-less "stubs" (the recipe is in the tool file), and any alias target with no real recipe gets an explicit `@:` recipe so make does not try the `<flow>-%` fallback rule on it. `HDL_KIND` is the normalised language key (`sv` or `vhdl`) used for per-language variables (`YOSYS_READ_$(HDL_KIND)`). The template defaults are `FRAMEWORK=vunit SIM=ghdl TOPLEVEL_HDL=vhdl`; `make init ... TOPLEVEL_HDL=sv` rewrites them in the project's `Makefile` to `cocotb`/`verilator`/`sv`, so a bare `make sim|lint|synth|impl|html` takes the project's language path. `lint-sv` and the sim targets depend on `regs`.
 
 ## Initial Setup (one-time)
 
@@ -243,16 +243,17 @@ Generated Testbenches/Build/Coverage pages (`docs/testbenches/`, `docs/synthesis
 `make init NAME=<name> TOPLEVEL_HDL=vhdl|sv` (default: `vhdl`):
 1. Moves `src/<hdl>/` files to `src/`, removes both `src/vhdl/` and `src/sv/`, and normalises `src/vhdl/` / `src/sv/` path references to `src/` across all config and doc files.
 2. Replaces all `<<NAME>>` in file contents with `<name>`.
-3. Renames all `NAME_*.ext` files (extensions: vhd sv v py toml ys xdc lpf rst cpp h hpp) to `<name>_*.ext`. Directories are never renamed, so directory names must be neutral.
+3. Renames all files whose name *begins* with `NAME_` (extensions: vhd sv v py toml ys xdc lpf rst cpp h hpp) to `<name>_*.ext`. Directories are never renamed, so directory names must be neutral. Names that merely *contain* `NAME` keep it: `tb/cocotb/test_NAME.py`, `tb/cocotb/pyuvm_tb/test_NAME_*.py` and `synth/constraints/NAME.xdc` (the cocotb Makefile refers to `test_NAME`, so the files are stable across projects).
+4. For `TOPLEVEL_HDL=sv`, rewrites the Makefile's `FRAMEWORK`/`SIM`/`TOPLEVEL_HDL` defaults (see Makefile Layout).
 
-After `make init`, `src/` is flat (no language subdirectories), `<<NAME>>` and `NAME_` file names are gone, and both Bender targets (`rtl_vhdl`, `rtl_sv`) reference `src/` — only the chosen language's files will exist there. Re-running with a different name is a no-op once the placeholders are gone.
+After `make init`, `src/` is flat (no language subdirectories), no `<<NAME>>` placeholder remains and no file name begins with `NAME_`, and both Bender targets (`rtl_vhdl`, `rtl_sv`) reference `src/` — only the chosen language's files will exist there. Re-running with a different name is a no-op once the placeholders are gone.
 
 ## Key Files
 
 - `Makefile` — user variables and includes; targets live in `scripts/mk/`, read the `## help` comments for documentation
 - `Bender.yml` — HDL source lists and external dependencies
 - `regs/NAME_regs.toml` — register definitions (post-init: `<name>_regs.toml`)
-- `scripts/gen_regs.py` — register generation driver (tests: `scripts/tests/`)
+- `scripts/gen_regs.py` — register generation driver (tests: `scripts/tests/`). `FIXED_VALUE_REGISTERS` (name → constant, e.g. `module_id`/`version`) and `NO_CORE_WIRING_REGISTERS` (e.g. a scratch register) are empty by default: edit them to make a register name special, otherwise every register field is wired to a same-named `<name>_core` port
 - `scripts/init_project.sh` — project initialisation
 - `docs/conf.py` — thin Sphinx wrapper around the tool's shared `conf.py`
 - `submodules/HDLAutoDoc` — git submodule; source of the HDL AutoDoc scripts and `autodoc.mk` (`scripts/gen_regs.py` and `docs/conf.py` remain project-owned)

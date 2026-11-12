@@ -549,3 +549,12 @@ def test_generate_sv_address_package_carries_the_register_files_own_address_widt
     width = int(reg_pkg.split("MIN_ADDR_WIDTH = ")[1].split(";")[0])
     addr_pkg = (tmp_path / "demo_regs_addr_pkg.sv").read_text()
     assert f"localparam int unsigned demo_addr_width = {width};" in addr_pkg
+
+
+def test_no_register_names_are_special_by_default():
+    # module_id/version (fixed values) and gpio (left unwired) were a downstream
+    # project's conventions. A template project's register called `version` or
+    # `gpio` must be wired to its core port like any other; projects opt in by
+    # adding names to these tables.
+    assert gen_regs.FIXED_VALUE_REGISTERS == {}
+    assert gen_regs.NO_CORE_WIRING_REGISTERS == set()

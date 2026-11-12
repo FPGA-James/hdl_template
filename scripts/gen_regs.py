@@ -160,13 +160,11 @@ def parse_sv_ports(core_file: Path) -> dict[str, Port]:
 #   hdl_registers.register_modes), so no core port is needed even for the
 #   read-back to work. Typical use: a pure scratch register to verify bus
 #   read/write access.
-FIXED_VALUE_REGISTERS: dict[str, int] = {
-    "module_id": 0x00000000,  # set per project, e.g. four ASCII characters -- recognizable at a glance in a memory dump
-    "version": 0x00010000,  # packed [31:24] reserved, [23:16] major, [15:8] minor, [7:0] patch = v1.0.0
-}
-NO_CORE_WIRING_REGISTERS: set[str] = {
-    "gpio",  # pure read/write scratch space; no hardware meaning yet
-}
+# Both tables are empty by default: no register name is special until your project adds it.
+# Example: FIXED_VALUE_REGISTERS = {"module_id": 0x41424344, "version": 0x00010000}
+FIXED_VALUE_REGISTERS: dict[str, int] = {}
+# Example: NO_CORE_WIRING_REGISTERS = {"scratch"}
+NO_CORE_WIRING_REGISTERS: set[str] = set()
 
 
 @dataclass

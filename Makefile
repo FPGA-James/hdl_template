@@ -15,8 +15,8 @@ FRAMEWORK    ?= vunit
 # Simulator: ghdl | verilator (cocotb only; VUnit always uses GHDL)
 SIM          ?= ghdl
 
-# HDL language for simulation/synthesis: vhdl | sv  (`make init` defaults to vhdl too;
-# pass TOPLEVEL_HDL=sv on every command, or change this default, for an SV project)
+# HDL language for simulation/synthesis: vhdl | sv. `make init ... TOPLEVEL_HDL=sv` rewrites
+# these three defaults (FRAMEWORK, SIM, TOPLEVEL_HDL) to cocotb/verilator/sv.
 TOPLEVEL_HDL ?= vhdl
 
 # Normalised language key used to pick per-language variables below

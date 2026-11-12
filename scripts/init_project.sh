@@ -113,6 +113,18 @@ done
 
 echo ""
 
+# ── SV projects: switch the Makefile's language defaults ───────────────────────
+# So a bare `make sim|lint|synth|impl|html` takes the SV path without TOPLEVEL_HDL=sv
+# on every command. A VHDL project keeps the template defaults (vunit/ghdl/vhdl).
+if [[ "$TOPLEVEL_HDL" == "sv" && -f Makefile ]]; then
+    sed "${SED_I[@]}" \
+        -e 's/^FRAMEWORK    ?= vunit/FRAMEWORK    ?= cocotb/' \
+        -e 's/^SIM          ?= ghdl/SIM          ?= verilator/' \
+        -e 's/^TOPLEVEL_HDL ?= vhdl/TOPLEVEL_HDL ?= sv/' Makefile
+    echo "  Makefile defaults set for SystemVerilog: FRAMEWORK=cocotb SIM=verilator TOPLEVEL_HDL=sv"
+    echo ""
+fi
+
 # ── Step 1: Replace <<NAME>> in file contents ──────────────────────────────────
 echo "Step 1: Replacing <<NAME>> in file contents..."
 CONTENT_COUNT=0
