@@ -110,6 +110,29 @@ def parse_sv_ports(core_file: Path) -> dict[str, Port]:
             continue
         port_match = re.match(r"(input|output|inout)\s+(.+?)\s+(\w+)$", entry)
         if not port_match:
+            # Check if this is an interface port (no input/output keyword).
+            # Interface ports have patterns like "axil_if.slave s_axil" with
+            # explicit modport.port syntax (required by Yosys). Captured
+            # below with direction="interface" rather than skipped -- see
+            # the comment on that branch for why.
+            # The dot is mandatory to distinguish from missing input/output keywords.
+            interface_match = re.match(r"(\w+)\.(\w+)\s+(\w+)$", entry)
+            if interface_match:
+                # Interface ports (e.g. "axis_if.slave s_axis") are never
+                # register-derived, so they never appear in field_mappings and
+                # never reach resolve_port_mappings' direction check -- but
+                # they DO need to reach build_passthrough_mappings, which
+                # connects any core port not covered by a register field to
+                # an identically-named _top port purely by name (no direction
+                # check there either). Capturing them here (direction=
+                # "interface") instead of skipping them is what makes e.g.
+                # <<NAME>>_core's s_axis auto-connect to <<NAME>>_top's s_axis, the same
+                # way clk already auto-connects to clk.
+                iface_type, modport, iface_name = interface_match.groups()
+                ports[iface_name] = Port(
+                    name=iface_name, direction="interface", type_str=f"{iface_type}.{modport}"
+                )
+                continue
             raise ValueError(f"Could not parse port declaration: {entry!r} in {core_file}")
         direction, type_str, name = port_match.groups()
         ports[name] = Port(name=name, direction=direction, type_str=type_str.strip())
@@ -119,6 +142,31 @@ def parse_sv_ports(core_file: Path) -> dict[str, Port]:
 # =============================================================================
 # Field-to-port mapping
 # =============================================================================
+
+# Registers that are read/write over the bus like any other, but
+# intentionally get NO matching <name>_core port -- auto-wiring skips them
+# entirely (build_field_mappings never emits a FieldMapping for them, so
+# resolve_port_mappings never demands a core port either). Two distinct
+# reasons a register ends up here:
+#
+# FIXED_VALUE_REGISTERS: 'r'-mode, no hardware behind it at all -- <name>_top
+#   drives its hwif_in field directly with a compile-time constant (see
+#   build_fixed_value_lines below) instead of instantiating a core port.
+#   Typical use: module_id/version, which never change at runtime.
+# NO_CORE_WIRING_REGISTERS: writable (w/r_w/wpulse), but the value software
+#   writes isn't consumed by anything (yet). Left unconnected: an r_w
+#   register's read side loops back the last-written value inside the
+#   generated register file itself (hardware_has_up=False for r_w -- see
+#   hdl_registers.register_modes), so no core port is needed even for the
+#   read-back to work. Typical use: a pure scratch register to verify bus
+#   read/write access.
+FIXED_VALUE_REGISTERS: dict[str, int] = {
+    "module_id": 0x41455331,  # ASCII "AES1" -- recognizable at a glance in a memory dump
+    "version": 0x00010000,  # packed [31:24] reserved, [23:16] major, [15:8] minor, [7:0] patch = v1.0.0
+}
+NO_CORE_WIRING_REGISTERS: set[str] = {
+    "gpio",  # pure read/write scratch space; no hardware meaning yet
+}
 
 
 @dataclass
@@ -135,24 +183,29 @@ class FieldMapping:
 
 def build_field_mappings(register_list) -> list[FieldMapping]:
     """Walk the register list and compute each field's expected core port name,
-    direction, and whether a VHDL type cast is needed to reach that port."""
+    direction, and whether a VHDL type cast is needed to reach that port.
+    Skips FIXED_VALUE_REGISTERS/NO_CORE_WIRING_REGISTERS entirely -- see
+    their docstring above."""
     mappings: list[FieldMapping] = []
     for register in register_list.register_objects:
+        if register.name in FIXED_VALUE_REGISTERS or register.name in NO_CORE_WIRING_REGISTERS:
+            continue
         mode = register.mode.shorthand
-        if mode in ("w", "r_w"):
+        if mode in ("w", "r_w", "wpulse"):
             direction, suffix = "down", "_i"
         elif mode == "r":
             direction, suffix = "up", "_o"
         else:
             raise ValueError(
                 f"Register '{register.name}' uses mode '{mode}', which "
-                "register auto-wiring does not support (only r, w, r_w — "
-                "this applies to VHDL and SystemVerilog projects alike, "
-                "since the wiring layer has no naming convention for other "
-                "modes yet). To replicate wpulse-style behavior, use a "
-                "plain 'w' field plus a core-side edge detector instead "
-                "(see the reset_count field in the example project's "
-                "register map and _core RTL for the pattern)."
+                "register auto-wiring does not support (only r, w, r_w, "
+                "wpulse — this applies to VHDL and SystemVerilog projects "
+                "alike, since the wiring layer has no naming convention "
+                "for other modes yet). To replicate wpulse-style behavior "
+                "without it, use a plain 'w' field plus a core-side edge "
+                "detector instead (see the reset_count field in the "
+                "example project's register map and _core RTL for the "
+                "pattern)."
             )
         for field in register.fields:
             mappings.append(
@@ -166,6 +219,41 @@ def build_field_mappings(register_list) -> list[FieldMapping]:
                 )
             )
     return mappings
+
+
+def build_fixed_value_lines(register_list, language: str) -> list[str]:
+    """Emit the line that drives each present FIXED_VALUE_REGISTERS entry's
+    'r'-mode field with its compile-time constant, bypassing <name>_core
+    entirely. A register named in FIXED_VALUE_REGISTERS but absent from this
+    project's register list is silently skipped (lets the dict be a fixed
+    superset shared across projects). Only single-field 'r'-mode registers
+    are supported -- the only shape FIXED_VALUE_REGISTERS is meant for."""
+    by_name = {r.name: r for r in register_list.register_objects if not isinstance(r, RegisterArray)}
+    lines = []
+    for reg_name, value in FIXED_VALUE_REGISTERS.items():
+        register = by_name.get(reg_name)
+        if register is None:
+            continue
+        if register.mode.shorthand != "r":
+            raise ValueError(
+                f"FIXED_VALUE_REGISTERS['{reg_name}'] must be mode 'r' (hardware-driven, "
+                f"no software write), got mode '{register.mode.shorthand}'"
+            )
+        if len(register.fields) != 1:
+            raise ValueError(
+                f"FIXED_VALUE_REGISTERS['{reg_name}'] must have exactly one field, "
+                f"got {len(register.fields)}"
+            )
+        field = register.fields[0]
+        width = field.width
+        if language == "vhdl":
+            # regs_up.<reg>.<field> is typed `unsigned` (see render_vhdl_wiring_block's
+            # bridging comment) -- to_unsigned needs a plain (non-hex-literal) integer.
+            lines.append(f"    regs_up.{reg_name}.{field.name} <= to_unsigned(16#{value:x}#, {width});")
+        else:
+            nibbles = (width + 3) // 4
+            lines.append(f"    assign hwif_in.{reg_name}.{field.name}.next = {width}'h{value:0{nibbles}x};")
+    return lines
 
 
 def resolve_port_mappings(mappings: list[FieldMapping], core_ports: dict[str, Port]) -> None:
@@ -279,7 +367,10 @@ def render_vhdl_signals_block(field_mappings: list[FieldMapping]) -> str:
 
 
 def render_vhdl_wiring_block(
-    name: str, field_mappings: list[FieldMapping], passthrough: dict[str, str]
+    name: str,
+    field_mappings: list[FieldMapping],
+    passthrough: dict[str, str],
+    fixed_value_lines: list[str] | None = None,
 ) -> str:
     # 'up' (output-port) BitVector fields need an intermediate signal --
     # GHDL rejects both std_logic_vector(...) and unsigned(...) as inline
@@ -313,11 +404,20 @@ def render_vhdl_wiring_block(
         "        );",
     ]
 
-    return "\n".join(bridge_assignments + ([""] if bridge_assignments else []) + instance)
+    fixed_value_lines = fixed_value_lines or []
+    return "\n".join(
+        bridge_assignments
+        + ([""] if bridge_assignments else [])
+        + instance
+        + ([""] + fixed_value_lines if fixed_value_lines else [])
+    )
 
 
 def render_sv_wiring_block(
-    name: str, field_mappings: list[FieldMapping], passthrough: dict[str, str]
+    name: str,
+    field_mappings: list[FieldMapping],
+    passthrough: dict[str, str],
+    fixed_value_lines: list[str] | None = None,
 ) -> str:
     port_lines = [f"        .{formal}({actual})" for formal, actual in passthrough.items()]
     for m in field_mappings:
@@ -327,13 +427,13 @@ def render_sv_wiring_block(
             actual = f"hwif_in.{m.register_name}.{m.field_name}.next"
         port_lines.append(f"        .{m.port_name}({actual})")
 
-    return "\n".join(
-        [
-            f"    {name}_core u_core (",
-            ",\n".join(port_lines),
-            "    );",
-        ]
-    )
+    instance = [
+        f"    {name}_core u_core (",
+        ",\n".join(port_lines),
+        "    );",
+    ]
+    fixed_value_lines = fixed_value_lines or []
+    return "\n".join(instance + ([""] + fixed_value_lines if fixed_value_lines else []))
 
 
 # =============================================================================
@@ -371,6 +471,52 @@ def _make_sv_synthesizable(text: str) -> str:
     text = re.sub(r"\bstruct \{", "struct packed {", text)
     text = re.sub(r"\bautomatic\s+", "", text)
     return text
+
+
+_SV_DECODE_PASS_DOWN = """    // Pass down signals to next stage
+    assign decoded_addr = cpuif_addr;
+    assign decoded_req = cpuif_req_masked;
+    assign decoded_req_is_wr = cpuif_req_is_wr;
+    assign decoded_wr_data = cpuif_wr_data;
+    assign decoded_wr_biten = cpuif_wr_biten;
+"""
+
+_SV_DECODE_REGISTERED = """    // Pass down signals to next stage, registered (scripts/gen_regs.py,
+    // _register_sv_decode): one cycle of latency for timing.
+    always_ff @(posedge clk) begin
+        if(rst) begin
+            decoded_reg_strb <= '0;
+            decoded_req <= '0;
+        end else begin
+            decoded_reg_strb <= decoded_reg_strb_c;
+            decoded_req <= cpuif_req_masked;
+        end
+        decoded_addr <= cpuif_addr;
+        decoded_req_is_wr <= cpuif_req_is_wr;
+        decoded_wr_data <= cpuif_wr_data;
+        decoded_wr_biten <= cpuif_wr_biten;
+    end
+"""
+
+
+def _register_sv_decode(text: str) -> str:
+    """Put a register between PeakRDL-regblock's address decode and its field logic.
+    The unregistered path (CPU-interface request, then address decode, then each field's
+    load enable, which fans out to every bit of the field) is the longest in the design at
+    250 MHz on ECP5. Read and write requests both pass through the register, so they
+    stay in order and keep equal latency (regblock's "latencies are balanced, stalls not
+    required" still holds). Each response comes one cycle later; the in-flight limit
+    already counts requests from acceptance, so the two-entry response buffer cannot
+    overflow. Raises if regblock's output no longer has the expected shape.
+    """
+    decl = "    decoded_reg_strb_t decoded_reg_strb;\n"
+    if decl not in text or _SV_DECODE_PASS_DOWN not in text:
+        raise ValueError("unexpected PeakRDL-regblock output: decode stage not found")
+    text = text.replace(decl, "    decoded_reg_strb_t decoded_reg_strb_c, decoded_reg_strb;\n")
+    text, n = re.subn(r"^(\s*)decoded_reg_strb\.(\w+) = ", r"\1decoded_reg_strb_c.\2 = ", text, flags=re.M)
+    if n == 0:
+        raise ValueError("unexpected PeakRDL-regblock output: no decoded_reg_strb assignments")
+    return text.replace(_SV_DECODE_PASS_DOWN, _SV_DECODE_REGISTERED)
 
 
 def render_sv_address_constants(register_list) -> str:
@@ -416,7 +562,8 @@ def generate_sv(register_list, output_folder: Path) -> None:
     an external interface definition.
 
     Post-processes both generated files (see `_make_sv_synthesizable`) so
-    the output is synthesizable by free/OSS Yosys, not just simulatable.
+    the output is synthesizable by free/OSS Yosys, not just simulatable, and
+    registers the register file's decode stage (see `_register_sv_decode`).
     """
     SystemVerilogAxiLiteGenerator(register_list=register_list, output_folder=output_folder).create(
         flatten_axi_lite=True
@@ -427,7 +574,10 @@ def generate_sv(register_list, output_folder: Path) -> None:
         f"{register_list.name}_register_file_axi_lite_pkg.sv",
     ):
         generated_file = output_folder / filename
-        generated_file.write_text(_make_sv_synthesizable(generated_file.read_text()))
+        text = _make_sv_synthesizable(generated_file.read_text())
+        if filename.endswith("_axi_lite.sv"):
+            text = _register_sv_decode(text)
+        generated_file.write_text(text)
 
     addr_pkg_file = output_folder / f"{register_list.name}_regs_addr_pkg.sv"
     addr_pkg_file.write_text(render_sv_address_constants(register_list))
@@ -508,6 +658,7 @@ def autowire_top(name: str, language: str, register_list, repo_root: Path) -> No
     field_mappings = build_field_mappings(register_list)
     resolve_port_mappings(field_mappings, core_ports)
     passthrough = build_passthrough_mappings(core_ports, field_mappings, top_ports)
+    fixed_value_lines = build_fixed_value_lines(register_list, language)
 
     if language == "vhdl":
         rewrite_marker_region(
@@ -520,14 +671,14 @@ def autowire_top(name: str, language: str, register_list, repo_root: Path) -> No
             top_file,
             "-- BEGIN AUTOGEN REGISTERS",
             "-- END AUTOGEN REGISTERS",
-            render_vhdl_wiring_block(name, field_mappings, passthrough),
+            render_vhdl_wiring_block(name, field_mappings, passthrough, fixed_value_lines),
         )
     else:
         rewrite_marker_region(
             top_file,
             "// BEGIN AUTOGEN REGISTERS",
             "// END AUTOGEN REGISTERS",
-            render_sv_wiring_block(name, field_mappings, passthrough),
+            render_sv_wiring_block(name, field_mappings, passthrough, fixed_value_lines),
         )
     print(f"  Auto-wired {top_file.relative_to(repo_root)}")
 

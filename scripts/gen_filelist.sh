@@ -60,15 +60,30 @@ bender_flist() {
 # flattening), so there is no real risk of both matching for the same
 # project and producing the "duplicate module name" collision an earlier
 # version of this script blanket-avoided by excluding SV entirely.
-if bender_flist rtl_vhdl; then
+# rtl_vhdl/rtl_sv output is captured (not printed directly by the if/elif
+# condition) so gen_vhdl/gen_sv can be printed BEFORE it -- see the comment
+# below for why the order matters.
+if rtl_vhdl_files=$(bender_flist rtl_vhdl); then
     # Generated register packages must also be listed so parse_hierarchy.py
     # can resolve entities instantiated from <<NAME>>_top (e.g.
     # <<NAME>>_register_file_axi_lite) — otherwise it KeyErrors on a child
     # module it never saw. Emitted only if `make regs` has already run.
+    #
+    # Emitted BEFORE rtl_vhdl, not after: parse_hierarchy.py's module-name
+    # pass reads the whole file list up front regardless of order, so this
+    # doesn't affect hierarchy correctness -- but when more than one module
+    # has no parent (e.g. helper modules not yet instantiated by
+    # <<NAME>>_core), it falls back to "last file in filelist.f is top". Putting
+    # the generated register file after <<NAME>>_top.vhd/.sv made *it* win that
+    # fallback instead of the real top (verified: produced
+    # hierarchy.json's "top": "<<NAME>>_register_file_axi_lite"). <<NAME>>_top itself
+    # must stay last for that fallback to keep working correctly.
     bender_flist gen_vhdl || true
-elif bender_flist rtl_sv; then
+    echo "$rtl_vhdl_files"
+elif rtl_sv_files=$(bender_flist rtl_sv); then
     # Same reasoning as gen_vhdl above, for the SV-generated register file.
     bender_flist gen_sv || true
+    echo "$rtl_sv_files"
 else
     echo "# (Bender unavailable or deps not fetched — using direct file list)"
     echo ""
@@ -79,6 +94,7 @@ else
         done
     fi
     # Project VHDL sources in compilation order (package → core → top).
+    # top listed last -- see the "Emitted BEFORE rtl_vhdl" comment above.
     # Add your project's files here after running `make init NAME=<project>`.
     for f in "$REPO_ROOT"/src/vhdl/<<NAME>>_pkg.vhd \
               "$REPO_ROOT"/src/vhdl/<<NAME>>_core.vhd \
@@ -92,6 +108,7 @@ else
         done
     fi
     # Project SV sources in compilation order (package → core → top).
+    # top listed last -- see the "Emitted BEFORE rtl_vhdl" comment above.
     for f in "$REPO_ROOT"/src/sv/<<NAME>>_pkg.sv \
               "$REPO_ROOT"/src/sv/<<NAME>>_core.sv \
               "$REPO_ROOT"/src/sv/<<NAME>>_top.sv; do

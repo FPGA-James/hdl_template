@@ -56,6 +56,49 @@ def test_parse_sv_ports_missing_module_raises(tmp_path):
         gen_regs.parse_sv_ports(bad_file)
 
 
+def test_parse_sv_ports_captures_interface_ports(tmp_path):
+    core_file = tmp_path / "demo_core.sv"
+    core_file.write_text(
+        "module demo_core (\n"
+        "    input  logic clk,\n"
+        "    input  logic rst_n,\n"
+        "    axis_if.slave  s_axis,\n"
+        "    axis_if.master m_axis\n"
+        ");\n"
+        "endmodule : demo_core\n"
+    )
+    ports = gen_regs.parse_sv_ports(core_file)
+    assert set(ports) == {"clk", "rst_n", "s_axis", "m_axis"}
+    assert ports["s_axis"].direction == "interface"
+    assert ports["s_axis"].type_str == "axis_if.slave"
+    assert ports["m_axis"].direction == "interface"
+    assert ports["m_axis"].type_str == "axis_if.master"
+
+
+def test_build_passthrough_mappings_connects_interface_ports_by_name(demo_register_list):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    core_ports = {
+        "clk": gen_regs.Port("clk", "input", "logic"),
+        "rst_n": gen_regs.Port("rst_n", "input", "logic"),
+        "enable_i": gen_regs.Port("enable_i", "input", "logic"),
+        "increment_i": gen_regs.Port("increment_i", "input", "int unsigned"),
+        "reset_count_i": gen_regs.Port("reset_count_i", "input", "logic"),
+        "enabled_o": gen_regs.Port("enabled_o", "output", "logic"),
+        "pulse_count_o": gen_regs.Port("pulse_count_o", "output", "logic [15:0]"),
+        "s_axis": gen_regs.Port("s_axis", "interface", "axis_if.slave"),
+        "m_axis": gen_regs.Port("m_axis", "interface", "axis_if.master"),
+    }
+    top_ports = {
+        "clk": gen_regs.Port("clk", "input", "logic"),
+        "rst_n": gen_regs.Port("rst_n", "input", "logic"),
+        "s_axis": gen_regs.Port("s_axis", "interface", "axis_if.slave"),
+        "m_axis": gen_regs.Port("m_axis", "interface", "axis_if.master"),
+    }
+    passthrough = gen_regs.build_passthrough_mappings(core_ports, mappings, top_ports)
+    assert passthrough["s_axis"] == "s_axis"
+    assert passthrough["m_axis"] == "m_axis"
+
+
 def test_build_field_mappings_derives_port_names_and_directions(demo_register_list):
     mappings = gen_regs.build_field_mappings(demo_register_list)
     by_field = {(m.register_name, m.field_name): m for m in mappings}
@@ -84,12 +127,100 @@ def test_build_field_mappings_rejects_unsupported_mode(tmp_path):
 
     toml_file = tmp_path / "bad_regs.toml"
     toml_file.write_text(
-        '[command]\nmode = "wpulse"\n[command.reset_count]\ntype = "bit"\n'
+        '[command]\nmode = "r_wpulse"\n[command.reset_count]\ntype = "bit"\n'
         'default_value = "0"\n'
     )
     register_list = from_toml(name="demo", toml_file=toml_file)
-    with pytest.raises(ValueError, match="wpulse"):
+    with pytest.raises(ValueError, match="r_wpulse"):
         gen_regs.build_field_mappings(register_list)
+
+
+def test_build_field_mappings_supports_wpulse_mode(tmp_path):
+    """wpulse is a real hdl_registers write-pulse mode (hardware sees an
+    already-pulsed signal, no core-side edge detection needed) -- wired the
+    same as plain 'w': down direction, '_i' suffix."""
+    from hdl_registers.parser.toml import from_toml
+
+    toml_file = tmp_path / "regs.toml"
+    toml_file.write_text('[irq_clear]\nmode = "wpulse"\n[irq_clear.clear]\ntype = "bit"\n')
+    register_list = from_toml(name="demo", toml_file=toml_file)
+
+    mappings = gen_regs.build_field_mappings(register_list)
+    assert len(mappings) == 1
+    assert mappings[0].direction == "down"
+    assert mappings[0].port_name == "clear_i"
+
+
+def test_build_field_mappings_skips_no_core_wiring_registers(tmp_path, monkeypatch):
+    """A register named in NO_CORE_WIRING_REGISTERS produces no FieldMapping at
+    all -- no <<NAME>>_core port is ever required for it."""
+    from hdl_registers.parser.toml import from_toml
+
+    monkeypatch.setattr(gen_regs, "NO_CORE_WIRING_REGISTERS", {"gpio"})
+    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {})
+
+    toml_file = tmp_path / "regs.toml"
+    toml_file.write_text('[gpio]\nmode = "r_w"\n[gpio.value]\ntype = "bit_vector"\nwidth = 32\n')
+    register_list = from_toml(name="demo", toml_file=toml_file)
+
+    assert gen_regs.build_field_mappings(register_list) == []
+
+
+def test_build_field_mappings_skips_fixed_value_registers(tmp_path, monkeypatch):
+    """A register named in FIXED_VALUE_REGISTERS produces no FieldMapping either
+    -- it's driven by a compile-time constant in <name>_top, not <<NAME>>_core."""
+    from hdl_registers.parser.toml import from_toml
+
+    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {"module_id": 0x41455331})
+    monkeypatch.setattr(gen_regs, "NO_CORE_WIRING_REGISTERS", set())
+
+    toml_file = tmp_path / "regs.toml"
+    toml_file.write_text('[module_id]\nmode = "r"\n[module_id.value]\ntype = "bit_vector"\nwidth = 32\n')
+    register_list = from_toml(name="demo", toml_file=toml_file)
+
+    assert gen_regs.build_field_mappings(register_list) == []
+
+
+def test_build_fixed_value_lines_sv(tmp_path, monkeypatch):
+    from hdl_registers.parser.toml import from_toml
+
+    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {"module_id": 0x41455331})
+
+    toml_file = tmp_path / "regs.toml"
+    toml_file.write_text('[module_id]\nmode = "r"\n[module_id.value]\ntype = "bit_vector"\nwidth = 32\n')
+    register_list = from_toml(name="demo", toml_file=toml_file)
+
+    lines = gen_regs.build_fixed_value_lines(register_list, "sv")
+    assert lines == ["    assign hwif_in.module_id.value.next = 32'h41455331;"]
+
+
+def test_build_fixed_value_lines_vhdl(tmp_path, monkeypatch):
+    from hdl_registers.parser.toml import from_toml
+
+    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {"module_id": 0x41455331})
+
+    toml_file = tmp_path / "regs.toml"
+    toml_file.write_text('[module_id]\nmode = "r"\n[module_id.value]\ntype = "bit_vector"\nwidth = 32\n')
+    register_list = from_toml(name="demo", toml_file=toml_file)
+
+    lines = gen_regs.build_fixed_value_lines(register_list, "vhdl")
+    assert lines == ["    regs_up.module_id.value <= to_unsigned(16#41455331#, 32);"]
+
+
+def test_build_fixed_value_lines_skips_registers_not_present(tmp_path, monkeypatch):
+    """FIXED_VALUE_REGISTERS naming a register this project's TOML doesn't
+    define is simply skipped, not an error -- lets the constant dict be a
+    superset across projects/templates."""
+    from hdl_registers.parser.toml import from_toml
+
+    monkeypatch.setattr(gen_regs, "FIXED_VALUE_REGISTERS", {"module_id": 0x1, "version": 0x2})
+
+    toml_file = tmp_path / "regs.toml"
+    toml_file.write_text('[module_id]\nmode = "r"\n[module_id.value]\ntype = "bit_vector"\nwidth = 32\n')
+    register_list = from_toml(name="demo", toml_file=toml_file)
+
+    lines = gen_regs.build_fixed_value_lines(register_list, "sv")
+    assert len(lines) == 1
 
 
 def test_resolve_port_mappings_passes_when_all_fields_match(demo_register_list, vhdl_core_file):
@@ -242,6 +373,26 @@ def test_render_sv_wiring_block_contains_expected_connections(demo_register_list
     assert ".enabled_o(hwif_in.status.enabled.next)" in block
     # SV struct fields are directly compatible -- no bridging signal needed.
     assert ".pulse_count_o(hwif_in.status.pulse_count.next)" in block
+
+
+def test_render_sv_wiring_block_includes_fixed_value_lines(demo_register_list):
+    """fixed_value_lines (from build_fixed_value_lines) are included in the
+    autogen region alongside the core instantiation, not silently dropped."""
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    block = gen_regs.render_sv_wiring_block(
+        "demo", mappings, {}, fixed_value_lines=["    assign hwif_in.module_id.value.next = 32'h41455331;"]
+    )
+    assert "assign hwif_in.module_id.value.next = 32'h41455331;" in block
+    assert "demo_core u_core (" in block
+
+
+def test_render_vhdl_wiring_block_includes_fixed_value_lines(demo_register_list):
+    mappings = gen_regs.build_field_mappings(demo_register_list)
+    block = gen_regs.render_vhdl_wiring_block(
+        "demo", mappings, {}, fixed_value_lines=["    regs_up.module_id.value <= to_unsigned(16#41455331#, 32);"]
+    )
+    assert "regs_up.module_id.value <= to_unsigned(16#41455331#, 32);" in block
+    assert "u_core : entity work.demo_core" in block
 
 
 def test_detect_language_flat_vhdl(tmp_path):

@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- **Placeholder form.** File contents use `<<NAME>>`; file names use a `NAME_` prefix (`NAME_core.sv`). `make init` substitutes the first and renames only **files** (`.vhd .sv .v .py .toml .ys .xdc .rst .cpp .h .hpp`), never directories. Directories therefore get neutral names (`tb/cocotb/pyuvm/`, not `NAME_pyuvm/`). AES's generic files have `aes` substituted in; convert every `aes` back to `<<NAME>>` (or `NAME_` in names).
+- **Placeholder form.** File contents use `<<NAME>>`; file names use a `NAME_` prefix (`NAME_core.sv`). `make init` substitutes the first and renames only **files** (`.vhd .sv .v .py .toml .ys .xdc .rst .cpp .h .hpp`), never directories. Directories therefore get neutral names (`tb/cocotb/pyuvm_tb/`, not `NAME_pyuvm/`). AES's generic files have `aes` substituted in; convert every `aes` back to `<<NAME>>` (or `NAME_` in names).
 - **Sources of AES files:** read them with `git -C /Users/james/Workspace/AES show 791ad7c:<path>` (main) or `git -C /Users/james/Workspace/AES show e1db0d9:<path>` (vhdl-2008). Do not read AES's working tree, and never modify AES.
 - Template ships `src/sv/` and `src/vhdl/`; `make init` flattens to `src/`. Bender targets `rtl_vhdl`, `rtl_sv`, `gen_vhdl`, `gen_sv`, `tb_vhdl` must work pre- and post-init.
 - Tools are chosen by top-level `Makefile` variables only (`FRAMEWORK`, `SIM`, `TOPLEVEL_HDL`, `SYNTH_TOOL`, `IMPL_TOOL`, `NATIVE_SIM`, `IMPL_FAMILY`). A new backend is one file in `scripts/mk/tools/`.
@@ -122,7 +122,7 @@ T=$(mktemp -d) && rsync -a --exclude .git --exclude .venv ./ $T/ && cd $T \
 ### Task 6: pyuvm testbench
 
 **Files:**
-- Create: `tb/cocotb/pyuvm/{__init__.py,NAME_golden_model.py,NAME_regs.py,NAME_top_env.py,NAME_top_sequences.py,test_NAME_regs.py,test_NAME_top.py}` (mirror AES's `tb/cocotb/aes_pyuvm/`; directory name stays neutral)
+- Create: `tb/cocotb/pyuvm_tb/{__init__.py,NAME_golden_model.py,NAME_regs.py,NAME_top_env.py,NAME_top_sequences.py,test_NAME_regs.py,test_NAME_top.py}` (mirror AES's `tb/cocotb/aes_pyuvm/`; directory name stays neutral)
 - Modify: `tb/cocotb/Makefile` (select the pyuvm modules), `requirements.txt` if pyuvm/cocotbext-axi are not yet pinned
 
 **Interfaces:**
