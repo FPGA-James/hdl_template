@@ -31,10 +31,10 @@ sim-vunit-gui: regs ## Open VUnit testbench in the GHDL waveform viewer
 	$(call check-venv)
 	@BENDER=$(BENDER) VUNIT_SIMULATOR=$(VUNIT_SIMULATOR) $(PYTHON) tb/vunit/run.py --gui $(VUNIT_ARGS)
 
-sim-cocotb: regs ## Run cocotb testbench  [SIM=  TOPLEVEL_HDL=vhdl|sv]
+sim-cocotb: regs ## Run cocotb testbench  [SIM=  TOPLEVEL_HDL=vhdl|sv  PYUVM=1 for the pyuvm bench]
 	@printf "\n\033[1m  Running cocotb simulation ($(SIM))...\033[0m\n\n"
 	@mkdir -p waves
-	@$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL) BENDER=$(BENDER)
+	@$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL) BENDER=$(BENDER) $(if $(PYUVM),PYUVM=$(PYUVM))
 
 # Native bench: dispatch to the selected tool's backend.
 sim-native: regs sim-native-$(NATIVE_SIM) ## Run the native (framework-less) testbench  [NATIVE_SIM=nvc|verilator  TOPLEVEL_HDL=vhdl|sv]

@@ -37,6 +37,11 @@ COCOTB_MAKEFILES := $(shell cocotb-config --makefiles)
 SIM          ?= ghdl
 TOPLEVEL_HDL ?= vhdl
 MODULE       ?= test_NAME
+# PYUVM=1 runs the pyuvm testbench (tb/cocotb/pyuvm_tb/) instead of test_NAME.py.
+PYUVM        ?= 0
+ifeq ($(PYUVM),1)
+    MODULE   := pyuvm_tb.test_NAME_top
+endif
 REPO_ROOT    := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))../..)
 BENDER       ?= bender
 
