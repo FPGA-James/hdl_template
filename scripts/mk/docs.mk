@@ -1,0 +1,90 @@
+# =============================================================================
+# scripts/mk/docs.mk — documentation (HDL AutoDoc / Sphinx)
+# =============================================================================
+.PHONY: coverage reports html pdf doc docs-preflight filelist
+
+# ── HDL AutoDoc pipeline variables ───────────────────────────────────────────
+# macOS: libxcb.dylib (needed by xcffib→cairocffi→cairosvg→sphinxcontrib.wavedrom)
+# lives in Homebrew's prefix, which is not in the default dyld search path.
+# SIP strips DYLD_LIBRARY_PATH from make's own env, but prefixing it inline on
+# each sphinx invocation bypasses that — the shell sets it for the child process
+# after its own dyld stripping has already occurred.
+ifeq ($(shell uname),Darwin)
+SPHINX_ENV := DYLD_LIBRARY_PATH=/opt/homebrew/lib:/usr/local/lib
+else
+SPHINX_ENV :=
+endif
+
+# ── HDL AutoDoc (submodule) ───────────────────────────────────────────────────
+# The documentation pipeline lives in the submodule's autodoc.mk (all of its
+# targets are prefixed `doc-`). Sphinx reads conf.py's base, static assets and
+# templates from the tool; only docs/conf.py (a thin wrapper) is ours.
+# autodoc.mk assigns its variables with `=`, so the overrides below must come
+# AFTER the include.
+AUTODOC_MK := submodules/HDLAutoDoc/src/autodoc.mk
+ifneq ($(wildcard $(AUTODOC_MK)),)
+include $(AUTODOC_MK)
+
+# Tool's own Sphinx config dir, captured before AUTODOC_CONFDIR is repointed at
+# our wrapper; docs/conf.py execs the tool's conf.py from here.
+AUTODOC_TOOL_CONFDIR := $(abspath $(AUTODOC_CONFDIR))
+AUTODOC_ENV          += AUTODOC_TOOL_CONFDIR="$(AUTODOC_TOOL_CONFDIR)"
+
+AUTODOC_SPHINXBUILD    = $(SPHINX_ENV) $(PYTHON) -m sphinx
+AUTODOC_SOURCEDIR      = docs
+AUTODOC_BUILDDIR       = out/docs
+AUTODOC_CONFDIR        = docs
+
+# doc-check-env (autodoc.mk >= v3.11) imports the Sphinx extensions; on macOS
+# sphinxcontrib.wavedrom -> cairosvg -> xcffib needs libxcb.dylib, which is only
+# found with DYLD_LIBRARY_PATH set inline (SIP strips it from make's env), so give
+# the check the same prefix the Sphinx call gets. Empty (harmless) off macOS.
+doc-check-env: PYTHON := $(SPHINX_ENV) $(PYTHON)
+else
+# Submodule not checked out: sim/synth/lint/etc. still work; only the doc
+# targets need it, and say so (check-submodule gives the same message).
+AUTODOC_SCRIPTDIR := submodules/HDLAutoDoc/src/scripts/hdl_autodoc
+doc-hierarchy doc-extract doc-html doc-pdf doc-coverage:
+	$(call check-submodule)
+endif
+
+# =============================================================================
+# Documentation
+# =============================================================================
+
+##@ Documentation
+
+html: regs doc-html ## Build full Sphinx HTML documentation
+	@printf "\n\033[32m  ✓\033[0m Documentation: \033[36m$(AUTODOC_BUILDDIR)/html/index.html\033[0m\n\n"
+
+pdf: regs doc-pdf ## Build PDF documentation via LaTeX
+
+doc: html pdf ## Build both HTML and PDF documentation
+
+coverage: doc-coverage ## Generate the documentation coverage report (docs/coverage.rst; also part of make html/pdf)
+	@$(PYTHON) $(AUTODOC_SCRIPTDIR)/generate_rst.py \
+	  $(AUTODOC_SRCDIR) $(AUTODOC_SOURCEDIR) "$(PROJECT)"
+
+# doc-html ingests $(AUTODOC_REPORTS_DIR) itself (v3.12+); this just runs that step alone.
+reports: doc-reports ## Ingest synthesis/PnR reports from out/reports/ into the docs (also done by make html)
+	@:
+
+# Project glue around autodoc.mk's pipeline (prerequisites are added to its
+# targets rather than copying their recipes):
+#   - doc-hierarchy needs filelist.f (from Bender via scripts/gen_filelist.sh)
+#     and a checked-out submodule + venv
+docs-preflight:
+	$(call check-venv)
+	$(call check-submodule)
+
+filelist:
+	@bash scripts/gen_filelist.sh > $(AUTODOC_FILELIST)
+
+doc-hierarchy: docs-preflight filelist
+
+# The coverage report is part of the normal build, so it is always current and its
+# page is in the toctree. It reads the extraction results, so it runs after
+# doc-extract; `coverage` then re-runs generate_rst.py so index.rst lists the page
+# before Sphinx builds.
+doc-coverage: doc-extract
+doc-html doc-pdf: coverage
