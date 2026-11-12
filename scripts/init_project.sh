@@ -154,7 +154,7 @@ done < <(find . \
     \( \
         -name "NAME_*.vhd" -o -name "NAME_*.sv" -o -name "NAME_*.v" \
         -o -name "NAME_*.py" -o -name "NAME_*.toml" -o -name "NAME_*.ys" \
-        -o -name "NAME_*.xdc" -o -name "NAME_*.rst" \
+        -o -name "NAME_*.xdc" -o -name "NAME_*.lpf" -o -name "NAME_*.rst" \
         -o -name "NAME_*.cpp" -o -name "NAME_*.h" -o -name "NAME_*.hpp" \
     \) -print0 2>/dev/null)
 

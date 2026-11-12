@@ -23,7 +23,7 @@ IMPL_PACKAGE    ?= CABGA256
 # ECP5 speed grade (6, 7 or 8; 8 is the fastest). Ignored for other families.
 IMPL_SPEED      ?= 8
 
-# Constraint file (.pcf for ice40, .lpf for ecp5/machxo2).
+# Constraint file (.pcf for ice40, .lpf for ecp5/machxo2); optional, see IMPL_PNR_CONSTRAINT_* below.
 IMPL_CONSTRAINT ?= synth/constraints/$(IMPL_TOPLEVEL).$(if $(filter ecp5 machxo2,$(IMPL_FAMILY)),lpf,pcf)
 
 IMPL_STEM = $(IMPL_TOPLEVEL)_$(IMPL_FAMILY)
@@ -32,9 +32,11 @@ IMPL_STEM = $(IMPL_TOPLEVEL)_$(IMPL_FAMILY)
 # nextpnr binary (nextpnr-$(IMPL_FAMILY)) and the bitstream packer.
 IMPL_CFG                   = out/impl/$(IMPL_TOPLEVEL).$(if $(filter ice40,$(IMPL_FAMILY)),asc,config)
 IMPL_BIT                   = out/impl/$(IMPL_TOPLEVEL).bit
-IMPL_PNR_CONSTRAINT_ice40   = --pcf "$(IMPL_CONSTRAINT)" --pcf-allow-unconstrained
-IMPL_PNR_CONSTRAINT_ecp5    = --lpf "$(IMPL_CONSTRAINT)" --lpf-allow-unconstrained --speed $(IMPL_SPEED)
-IMPL_PNR_CONSTRAINT_machxo2 = --lpf "$(IMPL_CONSTRAINT)"
+# The constraint file is optional: a top without one (e.g. IMPL_TOPLEVEL=<module>) has its pins
+# placed automatically, which is all an area/Fmax measurement needs.
+IMPL_PNR_CONSTRAINT_ice40   = $(if $(wildcard $(IMPL_CONSTRAINT)),--pcf "$(IMPL_CONSTRAINT)") --pcf-allow-unconstrained
+IMPL_PNR_CONSTRAINT_ecp5    = $(if $(wildcard $(IMPL_CONSTRAINT)),--lpf "$(IMPL_CONSTRAINT)") --lpf-allow-unconstrained --speed $(IMPL_SPEED)
+IMPL_PNR_CONSTRAINT_machxo2 = $(if $(wildcard $(IMPL_CONSTRAINT)),--lpf "$(IMPL_CONSTRAINT)")
 IMPL_PNR_OUT_ice40          = --asc "$(IMPL_CFG)"
 IMPL_PNR_OUT_ecp5           = --textcfg "$(IMPL_CFG)"
 IMPL_PNR_OUT_machxo2        = --textcfg "$(IMPL_CFG)"

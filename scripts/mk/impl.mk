@@ -11,16 +11,16 @@
 
 IMPL_TOOL ?= nextpnr
 
-# Top-level module for implementation. The default places <<NAME>>_top with its
-# pins left unconstrained (synth/constraints/<top>.lpf), which gives area and Fmax.
-# A design whose port bits exceed the package's pins needs a wrapper with few pins:
-# add it under the Bender target `impl_sv` (see Bender.yml) and set IMPL_TOPLEVEL.
-IMPL_TOPLEVEL ?= <<NAME>>_top
+# Top-level module for implementation, pins left unplaced (an area/Fmax measurement, not a
+# board design). SV: <<NAME>>_top. VHDL: <<NAME>>_core, because the AXI-Lite records of
+# <<NAME>>_top flatten to more IO bits than the default package has pins ("no BELs remaining").
+# A design whose ports exceed the package needs a few-pin wrapper: add it under the Bender
+# target `impl_sv` (see Bender.yml; SV only) and set IMPL_TOPLEVEL to it.
+IMPL_TOPLEVEL ?= $(if $(filter sv,$(HDL_KIND)),<<NAME>>_top,<<NAME>>_core)
 
-# Target clock in MHz. It is the FREQUENCY in the constraint file
-# (synth/constraints/<top>.lpf) and the figure `make impl` checks nextpnr's routed
-# result against, failing the build when it is not met.
-IMPL_FREQ_MHZ ?= 250
+# Target clock in MHz. It is passed to nextpnr as --freq and is the figure `make impl` checks
+# nextpnr's routed result against, failing the build when it is not met.
+IMPL_FREQ_MHZ ?= 200
 
 IMPL_RDIR = $(AUTODOC_REPORTS_DIR)/impl
 

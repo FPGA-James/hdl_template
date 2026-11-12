@@ -1,0 +1,13 @@
+# Implementation constraints for <<NAME>>_top (ECP5).
+#
+# The target clock is not set here: `make impl` passes nextpnr --freq
+# $(IMPL_FREQ_MHZ) so there is one place to change it.
+#
+# Pins are left unplaced on purpose: this flow measures the design's area and
+# timing, it is not a board design. `make impl` passes nextpnr
+# --lpf-allow-unconstrained so it places them itself. For a real board add, per
+# port:
+#   LOCATE COMP "clk" SITE "<ball>";
+#   IOBUF PORT "clk" IO_TYPE=LVCMOS33;
+#
+# Another top (IMPL_TOPLEVEL=<module>) needs its own synth/constraints/<module>.lpf.
