@@ -1,8 +1,8 @@
 # =============================================================================
-# scripts/mk/tools/yosys.mk — Yosys: synthesis (Xilinx 7-series), shared front end
+# scripts/mk/tools/yosys/yosys.mk — Yosys: synthesis (Xilinx 7-series), shared front end
 #
 # The YOSYS_READ_* / yosys-prep pieces are also used by the nextpnr
-# implementation flow (scripts/mk/tools/nextpnr.mk) to map the design to a target.
+# implementation flow (scripts/mk/tools/nextpnr/nextpnr.mk) to map the design to a target.
 # =============================================================================
 SYNTH_TOOLS += yosys
 .PHONY: synth-yosys synth-gui-yosys

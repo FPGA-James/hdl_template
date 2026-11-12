@@ -63,11 +63,11 @@ AUTODOC_REGISTERS_DIR ?= out/registers
 AUTODOC_REPORTS_DIR ?= out/reports
 
 # ── Tool registry ─────────────────────────────────────────────────────────────
-# Each scripts/mk/tools/<tool>.mk appends itself to the lists below for the flows it
+# Each scripts/mk/tools/<tool>/<tool>.mk appends itself to the lists below for the flows it
 # provides and defines the matching <flow>-<tool> targets. The dispatchers in
 # the flow files (sim.mk, synth.mk, impl.mk) turn `make synth` into
 # `synth-$(SYNTH_TOOL)` and use these lists in their "unknown tool" errors.
-# To add a tool: drop in scripts/mk/tools/<tool>.mk — nothing else needs editing.
+# To add a tool: drop in scripts/mk/tools/<tool>/<tool>.mk — nothing else needs editing.
 SYNTH_TOOLS      :=
 IMPL_TOOLS       :=
 SIM_NATIVE_TOOLS :=
@@ -118,5 +118,5 @@ endef
 define unknown-tool
 	@printf "\n\033[1;31m  ERROR:\033[0m No '$(1)' backend '$*' ($(2)=$($(2))).\n" && \
 	 printf  "         Registered: \033[36m$(3)\033[0m\n" && \
-	 printf  "         Backends live in scripts/mk/tools/<tool>.mk\n\n" && exit 1
+	 printf  "         Backends live in scripts/mk/tools/<tool>/<tool>.mk\n\n" && exit 1
 endef

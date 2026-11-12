@@ -2,7 +2,7 @@
 # scripts/mk/lint.mk — linting and tests
 #
 # `lint` lints the active language. The per-language linters live with their
-# tool: lint-vhdl in scripts/mk/tools/ghdl.mk, lint-sv in scripts/mk/tools/verilator.mk.
+# tool: lint-vhdl in scripts/mk/tools/ghdl/ghdl.mk, lint-sv in scripts/mk/tools/verilator/verilator.mk.
 # =============================================================================
 .PHONY: lint lint-vhdl lint-sv test-autodoc
 

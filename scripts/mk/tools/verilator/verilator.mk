@@ -1,5 +1,5 @@
 # =============================================================================
-# scripts/mk/tools/verilator.mk — Verilator: native SV bench, C++ bench, SV lint
+# scripts/mk/tools/verilator/verilator.mk — Verilator: native SV bench, C++ bench, SV lint
 # =============================================================================
 SIM_NATIVE_TOOLS += verilator
 .PHONY: sim-native-verilator sim-cpp lint-sv

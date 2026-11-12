@@ -30,7 +30,7 @@ impl: impl-$(IMPL_TOOL) ## Place-and-route  [IMPL_TOOL=nextpnr  IMPL_FAMILY=ice4
 impl-gui: impl-gui-$(IMPL_TOOL) ## Open the interactive placement/routing GUI  [IMPL_TOOL=nextpnr  IMPL_FAMILY=ice40|ecp5|machxo2  TOPLEVEL_HDL=vhdl|sv]
 	@:
 
-# Help entry only; the recipe is in scripts/mk/tools/icestudio.mk.
+# Help entry only; the recipe is in scripts/mk/tools/icestudio/icestudio.mk.
 icestudio: impl ## Run full impl then open IceStudio for device programming
 
 impl-gui-%:

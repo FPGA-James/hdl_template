@@ -4,7 +4,7 @@
 # Thin entry point: user-facing variables, then the includes. The logic lives in
 #   scripts/mk/core.mk     environment, Bender file lists, macros, tool registry
 #   scripts/mk/<flow>.mk   setup, sim, synth, impl, docs, lint, clean, help
-#   scripts/mk/tools/*.mk  one file per tool backend (yosys, nextpnr, nvc, verilator, ...)
+#   scripts/mk/tools/*/*.mk  one file per tool backend (yosys, nextpnr, nvc, verilator, ...)
 # Run `make help` for targets. To add a tool, drop a file into scripts/mk/tools/.
 # =============================================================================
 
@@ -45,7 +45,7 @@ SCHEMATICS   ?= $(if $(filter sv,$(HDL_KIND)),1,0)
 # must come first (tool registry, macros). Tool backends are picked up by
 # wildcard; flows dispatch to them by name (SYNTH_TOOL, IMPL_TOOL, NATIVE_SIM).
 include scripts/mk/core.mk
-include $(sort $(wildcard scripts/mk/tools/*.mk))
+include $(sort $(wildcard scripts/mk/tools/*/*.mk))
 include scripts/mk/setup.mk
 include scripts/mk/sim.mk
 include scripts/mk/synth.mk

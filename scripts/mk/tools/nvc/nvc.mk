@@ -1,5 +1,5 @@
 # =============================================================================
-# scripts/mk/tools/nvc.mk — NVC: native (framework-less) VHDL simulation
+# scripts/mk/tools/nvc/nvc.mk — NVC: native (framework-less) VHDL simulation
 # =============================================================================
 SIM_NATIVE_TOOLS += nvc
 .PHONY: sim-native-nvc

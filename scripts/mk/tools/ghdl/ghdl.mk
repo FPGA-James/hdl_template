@@ -1,5 +1,5 @@
 # =============================================================================
-# scripts/mk/tools/ghdl.mk — GHDL + vsg: VHDL lint
+# scripts/mk/tools/ghdl/ghdl.mk — GHDL + vsg: VHDL lint
 # =============================================================================
 .PHONY: lint-vhdl
 

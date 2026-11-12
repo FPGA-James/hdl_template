@@ -1,5 +1,5 @@
 # =============================================================================
-# scripts/mk/tools/icestudio.mk — IceStudio: device programming after `make impl`
+# scripts/mk/tools/icestudio/icestudio.mk — IceStudio: device programming after `make impl`
 # =============================================================================
 .PHONY: icestudio
 

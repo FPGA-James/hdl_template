@@ -1,7 +1,7 @@
 # =============================================================================
-# scripts/mk/tools/nextpnr.mk — open-source implementation: Yosys mapping + nextpnr + packer
+# scripts/mk/tools/nextpnr/nextpnr.mk — open-source implementation: Yosys mapping + nextpnr + packer
 #
-# Uses the Yosys front end from scripts/mk/tools/yosys.mk to map the design to the
+# Uses the Yosys front end from scripts/mk/tools/yosys/yosys.mk to map the design to the
 # target family, then nextpnr-<family> and the family's bitstream packer.
 # =============================================================================
 IMPL_TOOLS += nextpnr

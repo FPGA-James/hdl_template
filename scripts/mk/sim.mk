@@ -46,7 +46,7 @@ sim-native-vhdl: sim-native-nvc       ## Compile+elaborate+run tb/native/vhdl/<<
 	@:
 sim-native-sv:   sim-native-verilator ## Compile+run tb/native/sv/<<NAME>>_tb.sv directly with Verilator --binary (no framework)
 	@:
-# Help entry only; the recipe is in scripts/mk/tools/verilator.mk.
+# Help entry only; the recipe is in scripts/mk/tools/verilator/verilator.mk.
 sim-cpp: ## Compile+run tb/cpp/<<NAME>>_tb.cpp directly with Verilator --cc --exe --build (SV only)
 
 sim-native-%:
