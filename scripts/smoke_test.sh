@@ -81,7 +81,7 @@ run_lang() {
 
     # A name with a digit and an underscore exercises init's validation and substitution.
     step "$lang" "init" bash scripts/init_project.sh my_ip2 "$lang"
-    step "$lang" "init-residue" bash -c "! grep -rIl -e '<<NAM[E]>>' -e 'a[e]s' . --exclude-dir=.git --exclude-dir=submodules --exclude-dir=superpowers --exclude-dir=.venv | grep . && test -z \"\$(find . -name 'NAME_*' -not -path './submodules/*' -not -path './.venv/*')\""
+    step "$lang" "init-residue" bash -c "! grep -rIl -e '<<NAM[E]>>' -e 'a[e]s' . --exclude-dir=.git --exclude-dir=submodules --exclude-dir=superpowers --exclude-dir=.superpowers --exclude-dir=.venv | grep . && test -z \"\$(find . -name 'NAME_*' -not -path './submodules/*' -not -path './.venv/*')\""
     step "$lang" "venv" make venv
     step "$lang" "deps" make deps
     step "$lang" "regs" make regs

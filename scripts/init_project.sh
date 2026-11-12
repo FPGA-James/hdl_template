@@ -132,6 +132,7 @@ done < <(find . \
         -o -name "*.rst" -o -name "*.md"  -o -name "*.txt"  \
         -o -name "Makefile" -o -name "*.mk" -o -name "*.core" \
         -o -name "*.f"   -o -name "*.ys"  -o -name "*.xdc"  \
+        -o -name "*.lpf" -o -name "*.pcf" \
         -o -name "*.cpp" -o -name "*.h"   -o -name "*.hpp"  \
         -o -name "Bender.yml" \
     \) -print0 2>/dev/null)
