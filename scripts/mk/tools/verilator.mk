@@ -34,7 +34,7 @@ endif
 	@$(NATIVE_RDIR)/cpp_obj/<<NAME>>_tb_cpp
 	@printf "\n\033[32m  ✓\033[0m C++ testbench passed\n\n"
 
-lint-sv:
+lint-sv: regs
 	@printf "\n\033[1m  Linting SystemVerilog...\033[0m\n\n"
 	@$(BENDER) script verilator -t rtl_sv -t gen_sv 2>/dev/null | \
 	  xargs $(OSS_CAD_SUITE)/bin/verilator --lint-only --top-module "$(TOPLEVEL)" -Wall -Wno-fatal -Werror-WIDTHTRUNC -Isrc

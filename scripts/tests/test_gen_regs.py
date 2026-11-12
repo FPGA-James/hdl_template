@@ -526,3 +526,26 @@ def test_render_sv_address_constants_uses_real_index_across_a_register_array(
     assert "localparam int unsigned demo_conf_addr = 4 * 0;" in text
     assert "localparam int unsigned demo_status_addr = 4 * 5;" in text
     assert "chan" not in text
+
+
+def test_render_sv_address_constants_emits_address_width_when_given(demo_register_list):
+    # The generated register file's address ports are this many bits wide. Its own
+    # package names the constant in UPPERCASE (DEMO_REGISTER_FILE_AXI_LITE_MIN_ADDR_WIDTH),
+    # which <<NAME>> substitution cannot produce, so the top slices s_axil.awaddr with
+    # this lowercase copy instead.
+    text = gen_regs.render_sv_address_constants(demo_register_list, addr_width=4)
+    assert "localparam int unsigned demo_addr_width = 4;" in text
+
+
+def test_render_sv_address_constants_omits_address_width_by_default(demo_register_list):
+    assert "addr_width" not in gen_regs.render_sv_address_constants(demo_register_list)
+
+
+def test_generate_sv_address_package_carries_the_register_files_own_address_width(
+    demo_register_list, tmp_path
+):
+    gen_regs.generate_sv(demo_register_list, tmp_path)
+    reg_pkg = (tmp_path / "demo_register_file_axi_lite_pkg.sv").read_text()
+    width = int(reg_pkg.split("MIN_ADDR_WIDTH = ")[1].split(";")[0])
+    addr_pkg = (tmp_path / "demo_regs_addr_pkg.sv").read_text()
+    assert f"localparam int unsigned demo_addr_width = {width};" in addr_pkg

@@ -42,11 +42,23 @@ sources:
       - out/regs/vhdl/<<NAME>>_register_file_axi_lite.vhd
 
   # ── SystemVerilog RTL ──────────────────────────────────────────────────────
+  # axil_if.sv before its consumer: <<NAME>>_top.sv's port is typed using its modport, so the
+  # interface must be visible before its consumer is parsed (mirrors the
+  # package-before-consumer ordering used for gen_sv below).
   - target: rtl_sv
     files:
       - src/sv/<<NAME>>_pkg.sv
+      - src/sv/axil_if.sv
       - src/sv/<<NAME>>_core.sv
       - src/sv/<<NAME>>_top.sv
+
+  # ── SystemVerilog implementation-only sources (optional) ─────────────────────
+  # A wrapper with few pins for `make impl` when <<NAME>>_top has more port bits
+  # than the package has pins; set IMPL_TOPLEVEL to its module name. Not in rtl_sv,
+  # so it does not become a second top level in the docs hierarchy.
+  # - target: impl_sv
+  #   files:
+  #     - synth/<<NAME>>_impl_top.sv
 
   # ── Generated SystemVerilog register files (from `make regs`) ─────────────
   # Package first: the register file module's ports are typed using the

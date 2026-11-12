@@ -519,7 +519,7 @@ def _register_sv_decode(text: str) -> str:
     return text.replace(_SV_DECODE_PASS_DOWN, _SV_DECODE_REGISTERED)
 
 
-def render_sv_address_constants(register_list) -> str:
+def render_sv_address_constants(register_list, addr_width: int | None = None) -> str:
     """Generate a small SV package with one localparam per plain register's
     byte address (4 * the register's real index within the register list)
     -- the same computation the VHDL path's generated read/write package
@@ -542,9 +542,15 @@ def render_sv_address_constants(register_list) -> str:
     reachable from a template testbench file written pre-init. This also
     matches <name>_regs_pkg.vhd's existing lowercase constant convention
     (demo_conf, demo_command, demo_status).
+
+    `addr_width`, when given, adds `<name>_addr_width`: the bit width of the
+    generated register file's address ports, for the top to slice an
+    interface address down to (the register file's own constant is uppercase).
     """
     name = register_list.name
     lines = [f"package {name}_regs_addr_pkg;"]
+    if addr_width is not None:
+        lines.append(f"    localparam int unsigned {name}_addr_width = {addr_width};")
     for register in register_list.register_objects:
         if isinstance(register, RegisterArray):
             continue
@@ -579,8 +585,10 @@ def generate_sv(register_list, output_folder: Path) -> None:
             text = _register_sv_decode(text)
         generated_file.write_text(text)
 
+    reg_pkg = (output_folder / f"{register_list.name}_register_file_axi_lite_pkg.sv").read_text()
+    addr_width = int(re.search(r"MIN_ADDR_WIDTH\s*=\s*(\d+)", reg_pkg).group(1))
     addr_pkg_file = output_folder / f"{register_list.name}_regs_addr_pkg.sv"
-    addr_pkg_file.write_text(render_sv_address_constants(register_list))
+    addr_pkg_file.write_text(render_sv_address_constants(register_list, addr_width))
 
 
 # =============================================================================

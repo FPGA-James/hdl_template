@@ -25,6 +25,7 @@ filesets:
     description: "SystemVerilog RTL sources"
     files:
       - src/sv/<<NAME>>_pkg.sv
+      - src/sv/axil_if.sv
       - src/sv/<<NAME>>_core.sv
       - src/sv/<<NAME>>_top.sv
     file_type: systemVerilogSource
