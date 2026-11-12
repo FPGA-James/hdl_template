@@ -35,8 +35,10 @@ BENDER       ?= bender
 # Documentation title
 PROJECT      ?= $(notdir $(CURDIR))
 
-# Set to 1 to include RTL schematics in docs (requires yosys + ghdl-yosys-plugin)
-SCHEMATICS   ?= 1
+# RTL schematics in the docs (yosys + netlistsvg). On by default for SV; off for VHDL, where
+# HDL AutoDoc v3.13 does not read package files before a module's schematic (every module
+# using a package fails with "no declaration for ..."); SCHEMATICS=1 forces them on.
+SCHEMATICS   ?= $(if $(filter sv,$(HDL_KIND)),1,0)
 
 # Normalised language key used to pick per-language variables
 # (anything other than sv is treated as vhdl, as the recipes always did).

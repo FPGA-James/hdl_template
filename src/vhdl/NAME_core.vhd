@@ -38,7 +38,8 @@ use work.<<NAME>>_pkg.all;
 -- Parameterisable pulse counter. Counts input pulses when enabled and
 -- reports the running total via the status register interface.
 --
--- Register interface:
+-- Register interface::
+--
 --   enable_i      -- from conf register; enables counting
 --   increment_i   -- from conf register; step size per pulse (1..255)
 --   reset_count_i -- from command register; held-level request, core

@@ -30,7 +30,8 @@
 // Parameterisable pulse counter. Port interface is identical to the VHDL
 // <<NAME>>_core entity so that the same cocotb test suite covers both.
 //
-// Register interface:
+// Register interface::
+//
 //   enable_i      -- enables counting
 //   increment_i   -- step size per pulse (1..255)
 //   reset_count_i -- held-level request, core derives a one-cycle internal
