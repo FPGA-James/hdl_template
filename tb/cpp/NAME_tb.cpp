@@ -155,6 +155,9 @@ int main(int argc, char** argv) {
 
     printf("PASS: all C++ tests completed\n");
     top->final();
+    // A custom main must write the coverage itself (--binary benches do it for you); it goes to
+    // +verilator+coverage+file+... and does nothing unless built with --coverage.
+    Verilated::threadContextp()->coveragep()->write();
     delete top;
     return 0;
 }

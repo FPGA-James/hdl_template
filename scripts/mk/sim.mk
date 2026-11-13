@@ -19,13 +19,18 @@ VUNIT_SIMULATOR ?= ghdl
 NATIVE_SIM  ?= $(if $(filter sv,$(HDL_KIND)),verilator,nvc)
 NATIVE_RDIR  = out/native
 
+# Reports: vunit/ (vunit.log, xunit.xml -- JUnit results) and cocotb/ (cocotb.log, results.xml).
+# The native benches' reports are in their tool's folder (nvc/, verilator/).
+VUNIT_RDIR   = $(AUTODOC_REPORTS_DIR)/vunit
+COCOTB_RDIR  = $(AUTODOC_REPORTS_DIR)/cocotb
+
 sim: regs ## Run simulation  [FRAMEWORK=vunit|cocotb|native  SIM=ghdl|verilator  TOPLEVEL_HDL=vhdl|sv]
 	$(if $(filter vunit cocotb native,$(FRAMEWORK)),@$(MAKE) --no-print-directory sim-$(FRAMEWORK),$(error Unknown FRAMEWORK=$(FRAMEWORK). Valid: vunit | cocotb | native))
 
 sim-vunit: regs ## Run VUnit testbench via GHDL (VHDL only)
 	$(call check-venv)
 	@printf "\n\033[1m  Running VUnit simulation (GHDL)...\033[0m\n\n"
-	@BENDER=$(BENDER) VUNIT_SIMULATOR=$(VUNIT_SIMULATOR) $(PYTHON) tb/vunit/run.py $(VUNIT_ARGS)
+	$(call run-logged,$(VUNIT_RDIR)/vunit.log,BENDER=$(BENDER) VUNIT_SIMULATOR=$(VUNIT_SIMULATOR) $(PYTHON) tb/vunit/run.py --no-color --xunit-xml $(VUNIT_RDIR)/xunit.xml $(VUNIT_ARGS))
 
 sim-vunit-gui: regs ## Open VUnit testbench in the GHDL waveform viewer
 	$(call check-venv)
@@ -34,7 +39,7 @@ sim-vunit-gui: regs ## Open VUnit testbench in the GHDL waveform viewer
 sim-cocotb: regs ## Run cocotb testbench  [SIM=  TOPLEVEL_HDL=vhdl|sv  PYUVM=1 for the pyuvm bench]
 	@printf "\n\033[1m  Running cocotb simulation ($(SIM))...\033[0m\n\n"
 	@mkdir -p waves
-	@$(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL) BENDER=$(BENDER) $(if $(PYUVM),PYUVM=$(PYUVM))
+	$(call run-logged,$(COCOTB_RDIR)/cocotb.log,COCOTB_RESULTS_FILE=$(CURDIR)/$(COCOTB_RDIR)/results.xml $(MAKE) -C tb/cocotb SIM=$(SIM) TOPLEVEL_HDL=$(TOPLEVEL_HDL) BENDER=$(BENDER) $(if $(PYUVM),PYUVM=$(PYUVM)))
 
 # Native bench: dispatch to the selected tool's backend.
 sim-native: sim-native-$(NATIVE_SIM) ## Run the native (framework-less) testbench  [NATIVE_SIM=nvc|verilator  TOPLEVEL_HDL=vhdl|sv]

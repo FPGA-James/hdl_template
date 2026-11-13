@@ -47,6 +47,12 @@ IMPL_PNR_OUT_machxo2        = --textcfg "$(IMPL_CFG)"
 IMPL_PACK_ice40             = $(OSS_CAD_SUITE)/bin/icepack "$(IMPL_CFG)" "$(IMPL_BIT)"
 IMPL_PACK_ecp5              = $(OSS_CAD_SUITE)/bin/ecppack --compress "$(IMPL_CFG)" "$(IMPL_BIT)"
 IMPL_PACK_machxo2           = $(OSS_CAD_SUITE)/bin/ddtcmd -oft -bit -if "$(IMPL_CFG)" -of "$(IMPL_BIT)"
+# Post-route timing report of the family's own tool, where one exists (iCE40's icetime reads the
+# .asc; no -c, which would make it fail the build when the target is missed -- the verdict is
+# scripts/check_nextpnr_timing.sh's); ecp5 and machxo2 have none beyond nextpnr's own report.
+IMPL_REPORT_ice40           = $(OSS_CAD_SUITE)/bin/icetime -d $(IMPL_DEVICE) -P $(IMPL_PACKAGE) \
+                              -mtr "$(IMPL_RDIR)/$(IMPL_STEM)_icetime.rpt" -j "$(IMPL_RDIR)/$(IMPL_STEM)_icetime.json" \
+                              $(if $(wildcard $(IMPL_CONSTRAINT)),-p "$(IMPL_CONSTRAINT)") "$(IMPL_CFG)"
 # --timing-allow-fail: nextpnr would otherwise abort when the target frequency is missed and
 # leave no bitstream or report; scripts/check_nextpnr_timing.sh gives the pass/fail verdict instead.
 # IMPL_PNR_OPT: placer/router effort. A higher timing weight and timing-driven rip-up gain
@@ -70,7 +76,9 @@ impl-nextpnr-synth: regs
 	  -l "$(AUTODOC_REPORTS_DIR)/yosys/yosys.log" \
 	  $(YOSYS_READ_$(HDL_KIND)) \
 	  -p "synth_$(IMPL_FAMILY) -top $(IMPL_TOPLEVEL) -json out/impl/$(IMPL_STEM).json" \
-	  -p "tee -o $(AUTODOC_REPORTS_DIR)/yosys/stat.txt stat"
+	  -p "tee -o $(AUTODOC_REPORTS_DIR)/yosys/check.txt check" \
+	  -p "tee -o $(AUTODOC_REPORTS_DIR)/yosys/stat.txt stat" \
+	  -p "tee -o $(AUTODOC_REPORTS_DIR)/yosys/stat.json stat -json"
 
 impl-nextpnr: impl-nextpnr-synth
 	@printf "  \033[2m[nextpnr]\033[0m Place and route...\n"
@@ -85,6 +93,7 @@ impl-nextpnr: impl-nextpnr-synth
 	  -l       "$(AUTODOC_REPORTS_DIR)/yosys/nextpnr.log"
 	@printf "  \033[2m[pack]\033[0m Packing bitstream...\n"
 	@$(IMPL_PACK_$(IMPL_FAMILY))
+	@$(IMPL_REPORT_$(IMPL_FAMILY))
 	@printf "\n\033[32m  ✓\033[0m Bitstream: \033[36m$(IMPL_BIT)\033[0m\n"
 	@printf "    Reports: \033[36m$(IMPL_RDIR)/$(IMPL_STEM)_*\033[0m, \033[36m$(AUTODOC_REPORTS_DIR)/yosys/nextpnr.log\033[0m\n\n"
 	@printf "  \033[2m[timing]\033[0m Target $(IMPL_FREQ_MHZ) MHz:\n"

@@ -35,9 +35,10 @@ synth-yosys: regs
 	  -p "synth_xilinx -family xc7 -top $(TOPLEVEL) -edif out/synth/$(TOPLEVEL)_$(HDL_KIND).edif" \
 	  -p "tee -o $(SYNTH_RDIR)/check.txt check" \
 	  -p "tee -o $(SYNTH_RDIR)/stat.txt stat -tech xilinx" \
+	  -p "tee -o $(SYNTH_RDIR)/stat.json stat -tech xilinx -json" \
 	  -p "write_json $(SYNTH_RDIR)/netlist.json"
 	@printf "\n\033[32m  ✓\033[0m Netlist:  \033[36mout/synth/$(TOPLEVEL)_$(HDL_KIND).edif\033[0m\n"
-	@printf "    Reports: \033[36m$(SYNTH_RDIR)/\033[0m (yosys.log stat.txt check.txt netlist.json)\n\n"
+	@printf "    Reports: \033[36m$(SYNTH_RDIR)/\033[0m (yosys.log stat.txt stat.json check.txt netlist.json)\n\n"
 
 # Opens the JSON netlist written by synth-yosys (dispatched from synth-gui in scripts/mk/synth.mk).
 synth-gui-yosys: synth-yosys

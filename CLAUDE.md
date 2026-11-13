@@ -235,8 +235,24 @@ Generated Testbenches/Build/Coverage pages (`docs/testbenches/`, `docs/synthesis
 - **Top and pins:** the SV default is `<<NAME>>_top`, the VHDL default `<<NAME>>_core` (the VHDL top's AXI-Lite records flatten to more IO bits than the package has pins). Pins are left unplaced: the constraint file is optional (`synth/constraints/<top>.lpf`/`.pcf`, passed only if it exists) and nextpnr runs with `--lpf-allow-unconstrained`, so this measures area and Fmax and is not a board design. A top that does not fit needs a few-pin wrapper (Bender target `impl_sv`).
 - **Measured on the example counter** (default seed): SV top about 235–254 MHz (depends on the target, since placement is timing-driven), VHDL core about 310 MHz, iCE40 HX8K (`IMPL_FAMILY=ice40 IMPL_DEVICE=hx8k IMPL_PACKAGE=ct256`) about 139 MHz — pass `IMPL_FREQ_MHZ=100` there. Placement varies with the nextpnr seed and tool version.
 - **Family define:** the flow reads the RTL with `-DTARGET_<FAMILY>` (`TARGET_ECP5` by default; `YOSYS_DEFINES` in `scripts/mk/tools/yosys/yosys.mk`), so RTL can instantiate a family primitive where inference falls short. `make synth` (Xilinx 7-series), Verilator and the docs schematics do not set it.
-- **Reports** go to `out/reports/` (`yosys/yosys.log`, `stat.txt`, `nextpnr.log`), so `make html` shows utilization and timing on the Build page.
+- **Reports** go to `out/reports/` (`yosys/yosys.log`, `stat.txt`, `nextpnr.log`), so `make html` shows utilization and timing on the Build page; the full layout is under "Reports" below.
 - **Yosys + interfaces:** an interface instance connected to a submodule's interface port must be passed plain (`.s_axil(s_axil)`); selecting the modport on the connection leaves the wires undriven in Yosys and the logic is optimised away (`has no driver` warnings are the symptom). A function cannot use `return` (assign to the function name).
+
+### Reports (`out/reports/`)
+
+Every flow keeps what its tools print, plus the report files they can write, under `out/reports/<tool>/`, for HDL Log Lens (VS Code extension) (it reads `**/out/reports/**/*.log` and `**/*.rpt`, picks the parser from the file or folder name, and reads nextpnr's `*_timing.json` + `*_routed.json` for its Timing table). Logs are written by the `run-logged` macro in `scripts/mk/core.mk` (`tee`, so the terminal output and the exit status are unchanged); each tool's folder is a `<TOOL>_RDIR` variable in its `scripts/mk/tools/<tool>/` file. Keep new tools in a folder named after the tool.
+
+| Folder | Written by | Files |
+|---|---|---|
+| `yosys/` | `make synth`, `make impl` | `yosys.log`, `stat.txt`, `stat.json`, `check.txt`; synth also `netlist.json`. `make html` reads `yosys.log`, `stat.txt`, `nextpnr.log` at these exact names. `synth` and `impl` share the folder, so the last one run wins. |
+| `yosys/nextpnr.log`, `impl/` | `make impl` | `<top>_<family>_timing.json` (timing + utilization + critical paths), `_routed.json`, `_routed.sdf`, `_placed.svg`, `_routed.svg`; iCE40 also `_icetime.rpt` / `_icetime.json` |
+| `verilator/` | `lint-sv`, `sim-native`, `sim-cpp` | `lint.log`, `native_*` / `cpp_*`: `_build.log`, `_sim.log`, `_stats.txt`, `_coverage.dat`, `_coverage.info`, `_coverage/` (annotated sources), `_coverage.log` |
+| `nvc/` | `sim-native` (VHDL) | `sim.log` (with `--stats`), `<top>_tb.covdb`, `coverage/` (HTML), `coverage.xml` (Cobertura) |
+| `ghdl/`, `vsg/` | `lint-vhdl` | `ghdl/lint.log`; `vsg/vsg.log`, `vsg.json`, `vsg.xml` (JUnit), `code_quality.json` |
+| `vunit/` | `sim` (VUnit) | `vunit.log` (run with `--no-color`), `xunit.xml` |
+| `cocotb/` | `sim FRAMEWORK=cocotb` | `cocotb.log`, `results.xml` (via `COCOTB_RESULTS_FILE`) |
+
+Deliberately not produced: Yosys `ltp` (on a mapped netlist it prints false "Detected loop" warnings into `yosys.log`), nextpnr `--router2-heatmap` (writes no files).
 
 ### Template Initialisation
 

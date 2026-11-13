@@ -62,6 +62,11 @@ AUTODOC_REGISTERS_DIR ?= out/registers
 # autodoc.mk's own default is `reports`; setting it here (?=) before the include wins.
 AUTODOC_REPORTS_DIR ?= out/reports
 
+# Every tool also keeps what it prints, plus whatever report files it can write, in its own
+# folder under out/reports/ -- named after the tool, because HDL Log Lens finds a log's parser
+# from the file or folder name (verilator/ nvc/ yosys/ nextpnr ...) and reads **/out/reports/**/*.log
+# and **/*.rpt. Each tool's folder variable (<TOOL>_RDIR) is defined in its own scripts/mk/tools/ file.
+
 # ── Tool registry ─────────────────────────────────────────────────────────────
 # Each scripts/mk/tools/<tool>/<tool>.mk appends itself to the lists below for the flows it
 # provides and defines the matching <flow>-<tool> targets. The dispatchers in
@@ -75,6 +80,17 @@ SIM_NATIVE_TOOLS :=
 # =============================================================================
 # Macros
 # =============================================================================
+
+# bash, not /bin/sh: run-logged below needs PIPESTATUS.
+SHELL := bash
+
+# run-logged — run a command, show its output as usual and keep a copy (stdout + stderr) in a
+# log file for HDL Log Lens; the exit status is the command's, not tee's.
+# $(1) = log file  $(2) = command (a `&&` chain or a pipeline is fine)
+define run-logged
+	@mkdir -p $(dir $(1))
+	@{ $(2) ; } 2>&1 | tee $(1) ; exit $${PIPESTATUS[0]}
+endef
 
 # check-venv — abort with a clear message if the venv has not been created.
 define check-venv
