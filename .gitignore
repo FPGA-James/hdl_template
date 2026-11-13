@@ -67,3 +67,6 @@ docs/.extract_cache.json
 
 # VUnit build output
 tb/vunit/vunit_out/
+
+# Superpowers plans and specs (local working notes)
+docs/superpowers/
